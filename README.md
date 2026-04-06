@@ -1,10 +1,10 @@
-# Sing-box DDR Auto-Agent (Omni-Matrix Edition)
+# Sing-box- auto
 
 - [基于 Deterministic Deep Reasoning (DDR) 逻辑构建的物理级防弹脚本]
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-[！[Sing-box]（https://img.shields.io/badge/Core-Sing--box-blue）]（https://github.com/SagerNet/sing-box）  
+[！[ 唱盒 ]（https://img.shields.io/badge/Core-Sing--box-blue）]（https://github.com/SagerNet/sing-box） 
 
 [！[ 语言：双语 （https://img.shields.io/badge/Language-Bilingual-green）]（#english 版 ）  
 [![OS: Linux](https://img.shields.io/badge/OS-Linux-orange)](#)
