@@ -1,9 +1,9 @@
-# All-in-One Duo One-Click Deployment Script。
+# All-in-One Duo 。
 
 ---
 
 ## 🚀 功能特性 (Features)
-
+一键部署脚本 （One-Click Deployment Script）
 * **全维 SNI 矩阵:** 自动识别 VPS 厂商（AWS/GCP/Azure/阿里/腾讯等）及地理位置，动态匹配物理不可证伪的 SNI 域名。
 * **智能证书降级 (Tier 0/1):** * **Tier 0:** 检测到真实域名解析后，自动申请 Let's Encrypt 证书并挂载 Nginx 文档站伪装。
     * **Tier 1:** 无域名环境自动自愈，生成高阶平庸域名自签证书。
