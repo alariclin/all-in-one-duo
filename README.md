@@ -13,31 +13,19 @@
 <a name="-中文说明"></a>
 ## 中文说明
 
-**Aio-box** 是一款专为网络安全、隐私保护与路由优化打造的“双核·高可用”一键部署环境。本项目聚焦于 **Xray-core (v26+)** 与 **Sing-box (Testing)** 的原生深度集成，提供物理级防封锁与系统级并发性能优化。
+**Aio-box** 是一款专为网络安全、强隐私保护与路由优化打造的“双核·高可用”一键部署环境。本项目聚焦于 **Xray-core (v26+)** 与 **Sing-box (Testing)** 的原生深度集成，提供物理级防封锁与系统级并发性能优化。
 
 ### ✨ 核心特性
 * **TCP/UDP 443 双栈复用**: 完美实现 VLESS (TCP) 与 Hysteria 2 (UDP) 共享物理 443 端口，极致伪装并提升连接成功率。
-* **原生防封锁引擎**: Xray v26.3.27 原生支持，内置 Sing-box 端口跳跃 (NAT Hopping) 与 Chrome 指纹强校验，有效抵御 DPI 探测。
-* **动态 SNI 与自签发证书**: 支持自定义私有域名，并根据 SNI 自动生成防探测的 100 年期自签发安全证书。
-* **高可用本地化**: `sb` 快捷指令本地化物理执行，自带离线核心缓存，彻底免疫远程网络波动或代码库污染。
+* **新一代路由协议引擎**: Xray v26.3.27 原生支持，内置 Sing-box 端口跳跃 (NAT Hopping) 与 Chrome 指纹强校验，有效抵御 DPI 探测。
+* **动态 SNI 与自签发证书**: 支持自定义私有域名，并根据用户输入的 SNI 自动生成防探测的 100 年期自签发安全加密证书。
+* **高可用本地化**: `sb` 快捷指令本地化物理执行，自带离线核心缓存，彻底免疫远程访问异常或网络波动。
 * **自动提权与防呆设计**: 脚本自动获取 Root 权限，屏蔽退格键乱码与误触崩溃，提供极致流畅的极客交互体验。
 
 ### 🚀 快速部署
 
-无需手动切换用户，请直接复制以下指令到终端执行（指令已物理纯化，无干扰链接符号）：
+无需手动切换用户，请直接在终端复制并执行以下一键安装指令（指令已物理纯化，可直接粘贴）：
 
-**全球高速通道 (推荐海外机器使用):**
+**全球高速通道 (推荐海外服务器使用):**
 ```bash
 sudo bash -c "$(curl -Ls [https://raw.githubusercontent.com/alariclin/aio-box/main/install.sh](https://raw.githubusercontent.com/alariclin/aio-box/main/install.sh))"
-```
-
-**分发加速镜像 (中国大陆机器推荐):**
-```bash
-sudo bash -c "$(curl -Ls [https://ghp.ci/https://raw.githubusercontent.com/alariclin/aio-box/main/install.sh](https://ghp.ci/https://raw.githubusercontent.com/alariclin/aio-box/main/install.sh))"
-```
-
-#### ⚡ 全局管理
-安装完成后，在终端输入以下指令即可瞬间唤醒中控面板（支持离线唤醒）：
-```bash
-sb
-```
