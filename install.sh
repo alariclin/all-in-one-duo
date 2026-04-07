@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
 # ====================================================================
 # Aio-box Ultimate Console [Full Features | Shortcut 'sb']
-# Features: Single/All-in-One, Anti-Apple-SNI, Custom SNI, Port 443 Share
-# Author: Nbody | Version: 2026.04.Apex-Stable-V18-Final
-# Repo: https://github.com/alariclin/aio-box
 # ====================================================================
 
 export DEBIAN_FRONTEND=noninteractive
 
 RED='\033[0;31m' GREEN='\033[0;32m' YELLOW='\033[0;33m' BLUE='\033[0;36m' PURPLE='\033[0;35m' CYAN='\033[0;36m' NC='\033[0m' BOLD='\033[1m'
 
-# --- [0] 权限判定与环境清理 ---
+# --- [0] 自动提权引擎与环境清理 ---
 if [[ $EUID -ne 0 ]]; then
-    echo -e "${RED}[!] 必须使用 Root 权限运行此控制台！ / Root access is mandatory!${NC}"
-    exit 1
+    if command -v sudo >/dev/null 2>&1; then
+        exec sudo bash "$0" "$@"
+    else
+        echo -e "${RED}[!] 必须使用 Root 权限运行此控制台！请执行 'sudo su -'${NC}"
+        exit 1
+    fi
 fi
 sed -i '/acme.sh.env/d' ~/.bashrc >/dev/null 2>&1 || true
 USER_MIRROR_BASE="https://raw.githubusercontent.com/alariclin/aio-box/main/core"
@@ -26,7 +27,8 @@ setup_shortcut() {
         chmod +x /etc/ddr/aio.sh
     fi
     if [[ ! -f /usr/local/bin/sb ]]; then
-        echo 'bash /etc/ddr/aio.sh' > /usr/local/bin/sb
+        echo '#!/bin/bash' > /usr/local/bin/sb
+        echo 'sudo bash /etc/ddr/aio.sh "$@"' >> /usr/local/bin/sb
         chmod +x /usr/local/bin/sb
     fi
     return 0
@@ -78,7 +80,7 @@ calculate_sni() {
     else AUTO_REALITY="www.microsoft.com"; fi
 
     echo -e "\n${CYAN}======================================================${NC}"
-    echo -e "${BOLD}检测到系统推荐防封 SNI / Recommended SNI: ${GREEN}$AUTO_REALITY${NC}"
+    echo -e "${BOLD}系统推荐防封 SNI / Recommended SNI: ${GREEN}$AUTO_REALITY${NC}"
     read -ep "请输入自定义 SNI (直接回车则使用推荐值) / Enter custom SNI (Press Enter for default): " INPUT_SNI
     REALITY_SNI=${INPUT_SNI:-$AUTO_REALITY}
     echo -e "${CYAN}======================================================${NC}\n"
@@ -111,8 +113,9 @@ deploy_xray() {
     mkdir -p /usr/local/etc/xray; openssl ecparam -genkey -name prime256v1 -out /usr/local/etc/xray/hy2.key 2>/dev/null
     openssl req -new -x509 -days 36500 -key /usr/local/etc/xray/hy2.key -out /usr/local/etc/xray/hy2.crt -subj "/CN=www.microsoft.com" 2>/dev/null
 
+    # VLESS 与 HY2 完美共用物理端口 443 (底层区分 TCP 与 UDP)
     JSON_VLESS='{ "port": 443, "protocol": "vless", "settings": { "clients": [{"id": "'$UUID'", "flow": "xtls-rprx-vision"}], "decryption": "none" }, "streamSettings": { "network": "tcp", "security": "reality", "realitySettings": { "dest": "'$REALITY_SNI':443", "serverNames": ["'$REALITY_SNI'"], "privateKey": "'$PK'", "shortIds": ["'$SHORT_ID'"] } } }'
-    JSON_HY2='{ "port": 443, "protocol": "hysteria", "tag": "hy2-in", "settings": { "clients": [{"password": "'$HY2_PASS'"}] }, "streamSettings": { "network": "hysteria", "security": "tls", "tlsSettings": { "alpn": ["h3"], "certificates": [{ "certificateFile": "/usr/local/etc/xray/hy2.crt", "keyFile": "/usr/local/etc/xray/hy2.key" }] }, "hysteriaSettings": { "version": 2, "obfs": "salamander", "obfsPassword": "'$HY2_OBFS'" } } }'
+    JSON_HY2='{ "port": 443, "protocol": "hysteria", "tag": "hy2-in", "settings": { "clients": [{"password": "'$HY2_PASS'"}] }, "streamSettings": { "security": "tls", "tlsSettings": { "alpn": ["h3"], "certificates": [{ "certificateFile": "/usr/local/etc/xray/hy2.crt", "keyFile": "/usr/local/etc/xray/hy2.key" }] }, "hysteriaSettings": { "version": 2, "obfs": "salamander", "obfsPassword": "'$HY2_OBFS'" } } }'
     JSON_SS='{ "port": 2053, "protocol": "shadowsocks", "settings": { "method": "2022-blake3-aes-128-gcm", "password": "'$SS_PASS'", "network": "tcp,udp" } }'
 
     case $MODE in
@@ -137,6 +140,15 @@ LimitNPROC=infinity
 WantedBy=multi-user.target
 SVC_EOF
     systemctl daemon-reload && systemctl enable --now xray; systemctl restart xray
+    
+    sleep 1
+    if ! systemctl is-active --quiet xray; then
+        echo -e "${RED}[!] 致命错误：Xray 核心无法启动！ / Fatal Error: Core failed to start!${NC}"
+        echo -e "${YELLOW}显示错误日志如下：${NC}"
+        journalctl -u xray --no-pager -n 10
+        exit 1
+    fi
+
     cat > /etc/ddr/.env << ENV_EOF
 CORE="xray"
 MODE="$MODE"
@@ -171,6 +183,7 @@ deploy_singbox() {
     mkdir -p /etc/sing-box; openssl ecparam -genkey -name prime256v1 -out /etc/sing-box/hy2.key 2>/dev/null
     openssl req -new -x509 -days 36500 -key /etc/sing-box/hy2.key -out /etc/sing-box/hy2.crt -subj "/CN=www.microsoft.com" 2>/dev/null
 
+    # TCP(VLESS)与UDP(HY2)底层分离，共享物理端口 443
     JSON_VLESS='{ "type": "vless", "listen": "::", "listen_port": 443, "tcp_fast_open": true, "users": [{"uuid": "'$UUID'", "flow": "xtls-rprx-vision"}], "tls": { "enabled": true, "server_name": "'$REALITY_SNI'", "reality": { "enabled": true, "handshake": { "server": "'$REALITY_SNI'", "server_port": 443 }, "private_key": "'$PK'", "short_id": ["'$SHORT_ID'"] }, "utls": { "enabled": true, "fingerprint": "chrome" } } }'
     JSON_HY2='{ "type": "hysteria2", "listen": "::", "listen_port": 443, "up_mbps": 3000, "down_mbps": 3000, "port_hopping": "20000-50000", "port_hopping_interval": "30s", "obfs": { "type": "salamander", "password": "'$HY2_OBFS'" }, "users": [{"password": "'$HY2_PASS'"}], "tls": { "enabled": true, "certificate_path": "/etc/sing-box/hy2.crt", "key_path": "/etc/sing-box/hy2.key" } }'
     JSON_SS='{ "type": "shadowsocks", "listen": "::", "listen_port": 2053, "tcp_fast_open": true, "method": "2022-blake3-aes-128-gcm", "password": "'$SS_PASS'" }'
@@ -197,6 +210,15 @@ LimitNPROC=infinity
 WantedBy=multi-user.target
 SVC_EOF
     systemctl daemon-reload && systemctl enable --now sing-box; systemctl restart sing-box
+    
+    sleep 1
+    if ! systemctl is-active --quiet sing-box; then
+        echo -e "${RED}[!] 致命错误：Sing-box 核心无法启动！ / Fatal Error: Core failed to start!${NC}"
+        echo -e "${YELLOW}显示错误日志如下：${NC}"
+        journalctl -u sing-box --no-pager -n 10
+        exit 1
+    fi
+
     cat > /etc/ddr/.env << ENV_EOF
 CORE="singbox"
 MODE="$MODE"
@@ -310,7 +332,7 @@ while true; do
     systemctl is-active --quiet xray && STATUS="${GREEN}Running (Xray)${NC}" || { systemctl is-active --quiet sing-box && STATUS="${CYAN}Running (Sing-box)${NC}" || STATUS="${RED}Stopped${NC}"; }
     source /etc/ddr/.env 2>/dev/null && CUR_MODE="[${CORE}-${MODE}]" || CUR_MODE=""
     
-    clear; echo -e "${BLUE}======================================================${NC}\n${BOLD}${PURPLE}  Aio-box Ultimate Console [Apex V18 Final] ${NC}\n${BLUE}======================================================${NC}"
+    clear; echo -e "${BLUE}======================================================${NC}\n${BOLD}${PURPLE}  Aio-box Ultimate Console [Apex V21 Final] ${NC}\n${BLUE}======================================================${NC}"
     echo -e " IP: ${YELLOW}$IPV4${NC} | STATUS: $STATUS $CUR_MODE\n${BLUE}------------------------------------------------------${NC}"
     echo -e " ${YELLOW}--- Xray-core 独立/全家桶安装 | Single/All-in-One ---${NC}\n ${GREEN}1.${NC} 部署 VLESS-Vision (REALITY) / Deploy VLESS\n ${GREEN}2.${NC} 部署 Hysteria 2 / Deploy Hy2\n ${GREEN}3.${NC} 部署 Shadowsocks / Deploy SS-2022\n ${GREEN}4.${NC} 部署 协议全家桶 (三合一) / Deploy All-in-One\n${BLUE}------------------------------------------------------${NC}"
     echo -e " ${CYAN}--- Sing-box  独立/全家桶安装 | Single/All-in-One ---${NC}\n ${GREEN}5.${NC} 部署 VLESS-Vision (REALITY) / Deploy VLESS\n ${GREEN}6.${NC} 部署 Hysteria 2 / Deploy Hy2\n ${GREEN}7.${NC} 部署 Shadowsocks / Deploy SS-2022\n ${GREEN}8.${NC} 部署 协议全家桶 (三合一) / Deploy All-in-One\n${BLUE}------------------------------------------------------${NC}"
