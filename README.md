@@ -62,25 +62,58 @@ sb
 <a name="-english-description"></a>
 ## English Description
 
-**Aio-box** is a high-availability, dual-core (Xray/Sing-box) deployment environment designed for next-gen network security. 
+**Aio-boxo** is a high-availability, robust deployment environment designed for network security and routing optimization. Built on a dual-core architecture, it seamlessly integrates Xray-core and Sing-box, featuring automated YAML topology generation, offline core caching, and kernel-level TCP/BBR tuning.
 
 ### ✨ Key Features
-* **Xray v26 Native**: Fully optimized for Xray-core v26.3.27 with native Hysteria 2 protocol support.
-* **Sing-box Testing**: Implements native Port Hopping and Chrome Root Store fingerprinting.
-* **Triple-Source Reliability**: Intelligent failover between Official GitHub, Private Mirror, and Local Offline Cache.
-* **Anti-Detection**: Strips high-risk Apple SNIs; defaults to Microsoft global CDN for ultimate stealth.
-* **Bulletproof UX**: Localized `sb` shortcut with built-in OTA update module.
+* **Dual-Core Routing:** Native support for both Xray and Sing-box engines. Deploy modular network protocols with extreme flexibility.
+* **Secure Protocol Matrix:** Incorporates VLESS-TCP-Vision (REALITY), Hysteria 2 (Salamander obfuscation), and Shadowsocks 2022 for ultimate privacy and client compatibility.
+* **Bulletproof Local Exec:** The `sb` dashboard runs strictly locally. Core binaries are cached offline, ensuring 100% install success even if remote repositories go down.
+* **YAML Parser Engine:** Auto-renders standard URIs AND **Clash Meta (Mihomo) YAML proxies** immediately after compilation (uTLS enabled by default).
+* **Traffic Quota Guard:** API-based real-time bandwidth monitoring with an auto-killswitch to prevent malicious traffic abuse and overage billing.
+* **Geek-Level Tuning:** Automates Ulimit lifting, Swap memory injection, and advanced TCP congestion control (BBR) optimizations.
+
+### 🚀 Quick Start
+
+**⚠️ Prerequisite:** You must run this script as the Root user. Switch to Root by executing:
+```bash
+sudo su -
+```
+
+Once you have root access, run the following command to install:
+```bash
+bash <(curl -Ls https://raw.githubusercontent.com/alariclin/aio-box/main/install.sh)
+```
+
+#### ⚡ Global Dashboard
+Once compiled, type the following command to wake the management console instantly (Offline-capable):
+```bash
+sb
+```
+
+### 📂 Architecture Overview
+| Engine Base | Target Use Case | Technical Highlights |
+| :--- | :--- | :--- |
+| **🛡️ Xray-core** | Strong Privacy | `TCP-Vision` flow control, REALITY dynamic padding |
+| **⚡ Sing-box** | High Concurrency | ACME automation, Port-hopping, Multiplexing |
+
+### 🛠️ System Management
+* **[Option 09] Quota Monitor**: Precision API bandwidth tracking with automated network killswitch limits.
+* **[Option 10] Diagnostics**: IP Reputation checks and comprehensive server network benchmarks.
+* **[Option 11] VPS Tuning**: Unlock kernel concurrency, modify file-max, and tune BBR stacks.
+* **[Option 13] Export Topology**: Instantly render Universal URIs and **Clash Meta YAML structures**.
+* **[Option 14] OTA Update**: Force-sync the local bash instance with the latest cloud repository.
+* **[Option 15] Clean Purge**: Smart uninstaller with the option to keep the `sb` trigger and offline core cache for rapid recovery.
 
 ---
 
 ## ⚠️ 系统要求 / System Requirements
 * **OS**: Debian 10+, Ubuntu 20.04+, CentOS 8+, AlmaLinux.
-* **Init System**: Systemd is strictly required.
-* **User**: Root access is mandatory.
+* **Init System**: Systemd is strictly required for daemon persistence.
+* **Network**: Dual-stack IPv4 / IPv6 resolution fully supported.
 
 ## 🤝 反馈与交流 / Feedback & Support
-如果您在使用中遇到问题，欢迎提交 Issue：
-* [GitHub Issues](https://github.com/alariclin/aio-box/issues)
+Submit logs or suggestions at:
+* [GitHub Issues](https://github.com/alariclin/all-in-one-duo/issues)
 
 ## 📄 许可证 / License
 Released under the [MIT License](https://opensource.org/licenses/MIT).
