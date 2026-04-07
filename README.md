@@ -1,6 +1,6 @@
 # All-in-One Duo
 
-- [中文说明](#-中文说明) | [🌐 English Description](#-english-description)
+- [中文说明](#-中文说明) | [English Description](#-english-description)
 - 感谢 [Xray-core](https://github.com/XTLS/Xray-core) 与 [Sing-box](https://github.com/SagerNet/sing-box) 提供核心引擎支持。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
