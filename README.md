@@ -13,7 +13,7 @@
 <a name="-中文说明"></a>
 ## 中文说明
 
-**All-In-One Duo** 是一款专为网络安全与路由优化打造的“双核·高可用”一键部署环境。本项目将底层架构聚焦于 **Xray-core ** 与 **Sing-box ** 的无缝切换，并集成了内核级流量熔断与系统网络栈极客级调优机制。
+**All-In-One Duo** 是一款专为网络安全与路由优化打造的“双核·高可用”一键部署环境。本项目将底层架构聚焦于 **Xray-core (xhttp)** 与 **Sing-box (并发矩阵)** 的无缝切换，并集成了内核级流量熔断与系统网络栈极客级调优机制。
 
 ### ✨ 核心特性
 * **双核自适应驱动:** 智能调度 Xray-core 与 Sing-box 路由引擎。支持模块化组合部署，或单协议独立部署。
@@ -28,12 +28,12 @@
 在您的 Linux 服务器终端 (Root 用户) 执行以下指令：
 
 ```bash
-bash <(curl -Ls [https://raw.githubusercontent.com/alariclin/all-in-one-duo/main/install.sh](https://raw.githubusercontent.com/alariclin/all-in-one-duo/main/install.sh))
+bash <(curl -Ls https://raw.githubusercontent.com/alariclin/all-in-one-duo/main/install.sh)
 ```
 
-**快速分发镜像节点:**
+**快速分发镜像节点 (中国大陆机器推荐):**
 ```bash
-bash <(curl -Ls [https://ghp.ci/https://raw.githubusercontent.com/alariclin/all-in-one-duo/main/install.sh](https://ghp.ci/https://raw.githubusercontent.com/alariclin/all-in-one-duo/main/install.sh))
+bash <(curl -Ls https://ghp.ci/https://raw.githubusercontent.com/alariclin/all-in-one-duo/main/install.sh)
 ```
 
 #### ⚡ 全局管理指令
@@ -61,7 +61,7 @@ sb
 <a name="-english-description"></a>
 ## English Description
 
-**All-In-One Duo** is a high-availability, robust deployment environment designed for network security and routing optimization. Built on a dual-core architecture, it seamlessly integrates **Xray-core ** and **Sing-box**, featuring automated YAML topology generation and kernel-level TCP/BBR tuning.
+**All-In-One Duo** is a high-availability, robust deployment environment designed for network security and routing optimization. Built on a dual-core architecture, it seamlessly integrates **Xray-core (xhttp)** and **Sing-box**, featuring automated YAML topology generation and kernel-level TCP/BBR tuning.
 
 ### ✨ Key Features
 * **Dual-Core Routing:** Native support for both Xray and Sing-box engines. Deploy modular network protocols with extreme flexibility.
@@ -76,12 +76,12 @@ sb
 Execute the following command in your Linux terminal (Root access required):
 
 ```bash
-bash <(curl -Ls [https://raw.githubusercontent.com/alariclin/all-in-one-duo/main/install.sh](https://raw.githubusercontent.com/alariclin/all-in-one-duo/main/install.sh))
+bash <(curl -Ls https://raw.githubusercontent.com/alariclin/all-in-one-duo/main/install.sh)
 ```
 
 **Fast Global Mirror:**
 ```bash
-bash <(curl -Ls [https://ghp.ci/https://raw.githubusercontent.com/alariclin/all-in-one-duo/main/install.sh](https://ghp.ci/https://raw.githubusercontent.com/alariclin/all-in-one-duo/main/install.sh))
+bash <(curl -Ls https://ghp.ci/https://raw.githubusercontent.com/alariclin/all-in-one-duo/main/install.sh)
 ```
 
 #### ⚡ Global Dashboard
