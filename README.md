@@ -2,7 +2,7 @@
 
 - **[中文说明](#-中文说明) | [English Description](#-english-description)**
 - **致谢 / Credits:** 感谢 Xray-core 与 Sing-box 提供的强大网络路由与加密核心。
-- **Credits: We would like to thank Xray-core and Sing-box for providing powerful network routing and encryption cores.
+- Credits: We would like to thank Xray-core and Sing-box for providing powerful network routing and encryption cores.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![GitHub Stars](https://img.shields.io/github/stars/alariclin/aio-box?style=flat&color=yellow)](https://github.com/alariclin/aio-box/stargazers)
