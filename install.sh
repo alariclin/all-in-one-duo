@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ====================================================================
-# Aio-box Ultimate Console [Strict 443 & Socket Force Release]
-# Version: 2026.04.Apex-Stable-V37-Pro
+# Aio-box Ultimate Console [Strict 443 & Nuclear Purge Edition]
+# Version: 2026.04.Apex-Stable-V38-Pro
 # ====================================================================
 
 export DEBIAN_FRONTEND=noninteractive
@@ -31,10 +31,10 @@ setup_shortcut() {
 }
 
 check_env() {
-    if ! command -v jq >/dev/null || ! command -v fuser >/dev/null || ! command -v unzip >/dev/null; then
+    if ! command -v jq >/dev/null || ! command -v fuser >/dev/null || ! command -v unzip >/dev/null || ! command -v lsof >/dev/null; then
         echo -e "${YELLOW}[*] 正在同步系统依赖环境...${NC}"
         apt-get update -y -q || yum makecache -y -q
-        local deps=(wget curl jq openssl uuid-runtime cron fail2ban python3 bc unzip vnstat iptables tar psmisc)
+        local deps=(wget curl jq openssl uuid-runtime cron fail2ban python3 bc unzip vnstat iptables tar psmisc lsof)
         if command -v apt-get >/dev/null; then apt-get install -y -q "${deps[@]}"; else yum install -y -q "${deps[@]}"; fi
         systemctl enable cron vnstat 2>/dev/null || true
         systemctl start cron vnstat 2>/dev/null || true
@@ -52,7 +52,7 @@ get_architecture() {
 
 fetch_github_release() {
     local repo=$1; local keyword=$2; local output_file=$3
-    echo -e "${YELLOW} -> 正在从 GitHub 官方仓库获取最新版本 [${repo}]...${NC}"
+    echo -e "${YELLOW} -> 正在从 GitHub 获取最新版本 [${repo}]...${NC}"
     local api_url="https://api.github.com/repos/${repo}/releases/latest"
     local download_url=$(curl -sL "$api_url" | jq -r ".assets[] | select(.name | contains(\"$keyword\")) | .browser_download_url" | head -n 1)
     
@@ -84,11 +84,11 @@ fetch_geo_data() {
 
 pre_install_setup() {
     local MODE=$1
-    # 强制统一使用微软官方 SNI (完全规避 Apple/Google 监控)
+    # 强制统一使用微软官方 SNI (规避 Apple/Google 监控)
     AUTO_REALITY="www.microsoft.com"
 
     echo -e "\n${CYAN}======================================================================${NC}"
-    echo -e "${BOLD}🚀 部署前向导：自定义伪装域名 (SNI) 与物理端口${NC}"
+    echo -e "${BOLD}🚀 部署前向导：正统 443 端口部署方案${NC}"
     echo -e "   强制使用防监控 SNI: ${GREEN}$AUTO_REALITY${NC}"
     echo -e "${BLUE}----------------------------------------------------------------------${NC}"
 
@@ -116,17 +116,18 @@ pre_install_setup() {
     VLESS_PORT=${VLESS_PORT:-443}; HY2_PORT=${HY2_PORT:-443}; SS_PORT=${SS_PORT:-2053}
 }
 
-# --- 物理层套接字核弹清理 (根治 bind error) ---
+# --- 物理层套接字联合绞杀 ---
 release_ports() {
     echo -e "${YELLOW}[*] 正在执行内核级端口强制释放清理...${NC}"
-    systemctl stop xray sing-box 2>/dev/null || true
+    systemctl stop xray sing-box hysteria 2>/dev/null || true
     killall -9 xray sing-box hysteria 2>/dev/null || true
     
-    # 强制斩杀霸占目标端口的任何僵尸进程
-    local ports_to_clean=($VLESS_PORT $HY2_PORT $SS_PORT 443 2053)
+    # 使用 lsof 和 fuser 联合杀灭任何占用目标端口的进程 (包括 nginx/apache 等潜在冲突)
+    local ports_to_clean=($VLESS_PORT $HY2_PORT $SS_PORT)
     for p in "${ports_to_clean[@]}"; do
         fuser -k -9 ${p}/tcp 2>/dev/null || true
         fuser -k -9 ${p}/udp 2>/dev/null || true
+        lsof -ti:${p} | xargs kill -9 2>/dev/null || true
     done
     sleep 2
 }
@@ -152,7 +153,6 @@ deploy_xray() {
     mkdir -p /usr/local/etc/xray; openssl ecparam -genkey -name prime256v1 -out /usr/local/etc/xray/hy2.key 2>/dev/null
     openssl req -new -x509 -days 36500 -key /usr/local/etc/xray/hy2.key -out /usr/local/etc/xray/hy2.crt -subj "/CN=${HY2_SNI}" 2>/dev/null
 
-    # 严格遵循 Xray 语法，VLESS (TCP) 和 HY2 (UDP) 同时监听 0.0.0.0
     JSON_VLESS='{ "listen": "0.0.0.0", "port": '$VLESS_PORT', "protocol": "vless", "settings": { "clients": [{"id": "'$UUID'", "flow": "xtls-rprx-vision"}] }, "streamSettings": { "network": "tcp", "security": "reality", "realitySettings": { "dest": "'$VLESS_SNI':443", "serverNames": ["'$VLESS_SNI'"], "privateKey": "'$PK'", "shortIds": ["'$SHORT_ID'"] } } }'
     JSON_HY2='{ "listen": "0.0.0.0", "port": '$HY2_PORT', "protocol": "hysteria", "tag": "hy2-in", "settings": { "auth": "pass", "auth_str": "'$HY2_PASS'", "obfs": "salamander", "obfs_password": "'$HY2_OBFS'", "certificates": [{ "certificateFile": "/usr/local/etc/xray/hy2.crt", "keyFile": "/usr/local/etc/xray/hy2.key" }] } }'
     JSON_SS='{ "listen": "0.0.0.0", "port": '$SS_PORT', "protocol": "shadowsocks", "settings": { "method": "2022-blake3-aes-128-gcm", "password": "'$SS_PASS'", "network": "tcp,udp" } }'
@@ -163,7 +163,6 @@ deploy_xray() {
 { "log": { "loglevel": "warning" }, "inbounds": $INBOUNDS, "outbounds": [{ "protocol": "freedom" }] }
 EOF
 
-    # 抑制 iptables 报错的封装处理
     cat > /etc/systemd/system/xray.service << SVC_EOF
 [Unit]
 After=network.target
@@ -214,7 +213,6 @@ deploy_singbox() {
 { "log": { "level": "warn" }, "inbounds": $INBOUNDS, "outbounds": [{ "type": "direct" }] }
 EOF
 
-    # 抑制 iptables 报错的封装处理
     cat > /etc/systemd/system/sing-box.service << SVC_EOF
 [Unit]
 After=network.target
@@ -252,7 +250,7 @@ show_usage() {
     echo -e "11.  VPS优化: 解除 Linux 最大连接数限制，开启 BBR-Brutal 加速。"
     echo -e "13.  节点参数: 随时查看当前已安装的配置信息及通用 URI 链接。"
     echo -e "14.  OTA更新: 一键同步 GitHub 最新版脚本代码并无损热更新。"
-    echo -e "15.  彻底卸载: 物理清除所有核心、配置、服务进程及底层的 NAT 残留规则。\n"
+    echo -e "15.  彻底卸载: 核弹级物理清理，强制斩杀顽固进程并重置防火墙。\n"
     read -ep "按回车返回主菜单 / Press Enter to return..."
 }
 
@@ -269,7 +267,7 @@ VALUE=$(echo $TOTAL_TX | sed 's/[^0-9.]*//g')
 [[ "$TOTAL_TX" == *"T"* ]] && VALUE=$(echo "$VALUE * 1024" | bc)
 if (( $(echo "$VALUE >= $QUOTA_VAL" | bc -l) )); then
     systemctl stop xray sing-box 2>/dev/null
-    killall -9 xray sing-box 2>/dev/null || true
+    killall -9 xray sing-box hysteria 2>/dev/null || true
 fi
 EOF
         echo "$QUOTA_GB" > /etc/ddr/.quota_val; chmod +x /etc/ddr/quota.sh
@@ -311,11 +309,9 @@ view_config() {
     
     if [[ "$MODE" == *"VLESS"* ]] || [[ "$MODE" == *"ALL"* ]]; then
         echo -e "${YELLOW}[ VLESS-Vision 通用链接 ]${NC}\nvless://$UUID@$LINK_IP:$VLESS_PORT?encryption=none&flow=xtls-rprx-vision&security=reality&sni=$VLESS_SNI&fp=chrome&pbk=$PUBLIC_KEY&sid=$SHORT_ID&type=tcp#Aio-VLESS\n"
-        echo -e "${PURPLE}[ Clash Meta VLESS YAML ]${NC}\n  - name: Aio-VLESS\n    type: vless\n    server: $LINK_IP\n    port: $VLESS_PORT\n    uuid: $UUID\n    network: tcp\n    tls: true\n    flow: xtls-rprx-vision\n    servername: $VLESS_SNI\n    client-fingerprint: chrome\n    reality-opts:\n      public-key: $PUBLIC_KEY\n      short-id: $SHORT_ID\n"
     fi
     if [[ "$MODE" == *"HY2"* ]] || [[ "$MODE" == *"ALL"* ]]; then
         echo -e "${YELLOW}[ Hysteria 2 通用链接 ]${NC}\n(注: iOS小火箭请务必开启\"允许不安全\"或\"跳过证书验证\")\nhysteria2://$HY2_PASS@$LINK_IP:$HY2_PORT/?insecure=1&sni=$HY2_SNI&alpn=h3&obfs=salamander&obfs-password=$HY2_OBFS&mport=20000-50000#Aio-Hy2\n"
-        echo -e "${PURPLE}[ Clash Meta Hysteria2 YAML ]${NC}\n  - name: Aio-Hy2\n    type: hysteria2\n    server: $LINK_IP\n    port: '20000-50000'\n    password: $HY2_PASS\n    alpn: [h3]\n    sni: $HY2_SNI\n    skip-cert-verify: true\n    obfs: salamander\n    obfs-password: $HY2_OBFS\n"
     fi
     if [[ "$MODE" == *"SS"* ]] || [[ "$MODE" == *"ALL"* ]]; then
         SS_BASE64=$(echo -n "2022-blake3-aes-128-gcm:${SS_PASS}" | base64 -w 0 2>/dev/null || echo -n "2022-blake3-aes-128-gcm:${SS_PASS}" | base64 | tr -d '\n')
@@ -328,34 +324,35 @@ view_config() {
     read -ep "按回车返回主菜单..."
 }
 
+# --- 终极核弹级卸载引擎 ---
 clean_uninstall() {
-    clear; echo -e "${RED}⚠️  卸载交互向导 / Uninstall Wizard${NC}\n 1. 仅删除核心与配置 / Remove core & config\n 2. 彻底抹除一切痕迹 / Complete purge"
+    clear; echo -e "${RED}⚠️  核弹级卸载交互向导 / Nuclear Uninstall Wizard${NC}\n 1. 仅删除核心与配置 / Remove core & config\n 2. 彻底物理清场 (恢复处女态) / Complete Purge"
     read -ep " 请选择 [1-2]: " clean_choice
     
-    systemctl stop xray sing-box 2>/dev/null || true
+    echo -e "${YELLOW}[*] 正在执行暴力进程绞杀...${NC}"
+    systemctl stop xray sing-box hysteria 2>/dev/null || true
+    systemctl disable xray sing-box hysteria 2>/dev/null || true
     killall -9 xray sing-box hysteria 2>/dev/null || true
-    systemctl disable xray sing-box 2>/dev/null || true
     
     local ipt_cmd=$(command -v iptables || echo "/sbin/iptables")
     local ip6t_cmd=$(command -v ip6tables || echo "/sbin/ip6tables")
-    local ports_to_clear="443 2053"
-    [[ -f /etc/ddr/.env ]] && source /etc/ddr/.env 2>/dev/null
-    [[ -n "$VLESS_PORT" ]] && ports_to_clear="$ports_to_clear $VLESS_PORT"
-    [[ -n "$HY2_PORT" ]] && ports_to_clear="$ports_to_clear $HY2_PORT"
     
-    for port in $(echo $ports_to_clear | tr ' ' '\n' | sort -u); do
-        while $ipt_cmd -t nat -D PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports $port 2>/dev/null; do :; done
-        while $ip6t_cmd -t nat -D PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports $port 2>/dev/null; do :; done
-    done
+    echo -e "${YELLOW}[*] 正在粉碎 iptables/NAT 残留链...${NC}"
+    # 强制循环清空可能的残留，不依赖具体端口
+    $ipt_cmd -t nat -F PREROUTING 2>/dev/null || true
+    $ip6t_cmd -t nat -F PREROUTING 2>/dev/null || true
     
-    rm -rf /usr/local/etc/xray /etc/sing-box /usr/local/bin/xray /usr/local/bin/sing-box /etc/systemd/system/xray.service /etc/systemd/system/sing-box.service
+    echo -e "${YELLOW}[*] 正在销毁物理文件与系统服务...${NC}"
+    rm -rf /usr/local/etc/xray /etc/sing-box /usr/local/bin/xray /usr/local/bin/sing-box /etc/systemd/system/xray.service /etc/systemd/system/sing-box.service /etc/systemd/system/hysteria.service
     systemctl daemon-reload
     
     if [[ "$clean_choice" == "2" ]]; then
         crontab -l 2>/dev/null | grep -v "/etc/ddr/quota.sh" | crontab - 2>/dev/null || true
-        rm -rf /etc/ddr /usr/local/bin/sb; echo -e "${GREEN}✔ 环境与防火墙规则已彻底物理清空。 / Environment purged.${NC}"; exit 0
+        rm -rf /etc/ddr /usr/local/bin/sb
+        echo -e "${GREEN}✔ 环境与防火墙规则已 100% 物理清空，VPS 现已恢复处女态！${NC}"; exit 0
     else
-        rm -f /etc/ddr/.env; echo -e "${GREEN}✔ 核心与防火墙规则已清理，快捷键缓存保留。 / Configs removed.${NC}"; sleep 2
+        rm -f /etc/ddr/.env
+        echo -e "${GREEN}✔ 核心与防火墙规则已清理，快捷键缓存保留。${NC}"; sleep 2
     fi
 }
 
@@ -366,7 +363,7 @@ while true; do
     systemctl is-active --quiet xray && STATUS="${GREEN}Running (Xray)${NC}" || { systemctl is-active --quiet sing-box && STATUS="${CYAN}Running (Sing-box)${NC}" || STATUS="${RED}Stopped${NC}"; }
     source /etc/ddr/.env 2>/dev/null && CUR_MODE="[${CORE}-${MODE}]" || CUR_MODE=""
     
-    clear; echo -e "${BLUE}======================================================================${NC}\n${BOLD}${PURPLE}  Aio-box Ultimate Console [Apex V37 Ultimate] ${NC}\n${BLUE}======================================================================${NC}"
+    clear; echo -e "${BLUE}======================================================================${NC}\n${BOLD}${PURPLE}  Aio-box Ultimate Console [Apex V38 Ultimate] ${NC}\n${BLUE}======================================================================${NC}"
     echo -e " IP: ${YELLOW}$IPV4${NC} | STATUS: $STATUS $CUR_MODE\n${BLUE}----------------------------------------------------------------------${NC}"
     echo -e " ${YELLOW}[ Xray-core 部署 / Deploy ]${NC}       ${CYAN}[ Sing-box 部署 / Deploy ]${NC}"
     echo -e " ${GREEN}1.${NC} VLESS-Vision (REALITY)          ${GREEN}5.${NC} VLESS-Vision (REALITY)"
