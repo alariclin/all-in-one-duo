@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # ====================================================================
-# Aio-box Ultimate Console [Full Features | Shortcut 'sb']
-# Features: Standard 443 Enforce, Microsoft SNI, Kill-9 Socket Release
-# Version: 2026.04.Apex-Stable-V35-Ultimate
+# Aio-box Ultimate Console [Strict 443 & Socket Force Release]
+# Version: 2026.04.Apex-Stable-V37-Pro
 # ====================================================================
 
 export DEBIAN_FRONTEND=noninteractive
@@ -13,13 +12,12 @@ if [[ $EUID -ne 0 ]]; then
     if command -v sudo >/dev/null 2>&1; then
         exec sudo bash "$0" "$@"
     else
-        echo -e "${RED}[!] 必须使用 Root 权限运行此控制台！请执行 'sudo su -'${NC}"
-        exit 1
+        echo -e "${RED}[!] 必须使用 Root 权限运行！请执行 'sudo su -'${NC}"; exit 1
     fi
 fi
 sed -i '/acme.sh.env/d' ~/.bashrc >/dev/null 2>&1 || true
 
-# --- [1] 本地化快捷指令与环境准备 ---
+# --- [1] 本地化快捷指令与环境 ---
 setup_shortcut() {
     mkdir -p /etc/ddr
     if [[ ! -f /etc/ddr/aio.sh || "$1" == "update" ]]; then
@@ -33,13 +31,13 @@ setup_shortcut() {
 }
 
 check_env() {
-    if ! command -v jq >/dev/null || ! command -v vnstat >/dev/null || ! command -v fuser >/dev/null || ! command -v unzip >/dev/null; then
-        echo -e "${YELLOW}[*] 正在同步系统依赖环境... / Syncing dependencies...${NC}"
+    if ! command -v jq >/dev/null || ! command -v fuser >/dev/null || ! command -v unzip >/dev/null; then
+        echo -e "${YELLOW}[*] 正在同步系统依赖环境...${NC}"
         apt-get update -y -q || yum makecache -y -q
         local deps=(wget curl jq openssl uuid-runtime cron fail2ban python3 bc unzip vnstat iptables tar psmisc)
         if command -v apt-get >/dev/null; then apt-get install -y -q "${deps[@]}"; else yum install -y -q "${deps[@]}"; fi
-        systemctl enable cron vnstat 2>/dev/null || systemctl enable cronie vnstat 2>/dev/null
-        systemctl start cron vnstat 2>/dev/null || systemctl start cronie vnstat 2>/dev/null
+        systemctl enable cron vnstat 2>/dev/null || true
+        systemctl start cron vnstat 2>/dev/null || true
     fi
 }
 
@@ -77,45 +75,39 @@ fetch_github_release() {
 
 fetch_geo_data() {
     local file_name=$1; local official_url=$2
-    echo -e "${YELLOW} -> 拉取 Geo 数据库: [${file_name}]...${NC}"
     local mirrors=("" "https://ghp.ci/" "https://ghproxy.net/")
     for mirror in "${mirrors[@]}"; do
         if curl -fLs --connect-timeout 10 "${mirror}${official_url}" -o "/tmp/${file_name}" && [[ -s "/tmp/${file_name}" ]]; then return 0; fi
     done
-    echo -e "${RED}[!] Geo 数据下载失败。${NC}"; exit 1
+    exit 1
 }
 
 pre_install_setup() {
     local MODE=$1
-    # 强力穿透方案：全局统一使用微软官方 SNI，隐蔽性极高
+    # 强制统一使用微软官方 SNI (完全规避 Apple/Google 监控)
     AUTO_REALITY="www.microsoft.com"
 
     echo -e "\n${CYAN}======================================================================${NC}"
     echo -e "${BOLD}🚀 部署前向导：自定义伪装域名 (SNI) 与物理端口${NC}"
-    echo -e "   系统推荐高抗封锁 SNI: ${GREEN}$AUTO_REALITY${NC}"
+    echo -e "   强制使用防监控 SNI: ${GREEN}$AUTO_REALITY${NC}"
     echo -e "${BLUE}----------------------------------------------------------------------${NC}"
 
     if [[ "$MODE" == *"VLESS"* ]] || [[ "$MODE" == *"ALL"* ]]; then
-        echo -e "${BOLD}[VLESS-Vision] 设置 / Setup${NC}"
-        read -ep "   请输入 VLESS 伪装 SNI (回车默认使用微软): " INPUT_V_SNI
+        read -ep "   [VLESS] 请输入伪装 SNI (回车默认使用微软): " INPUT_V_SNI
         VLESS_SNI=${INPUT_V_SNI:-$AUTO_REALITY}
-        read -ep "   请输入 VLESS 监听端口 (回车默认使用标准 443): " INPUT_V_PORT
+        read -ep "   [VLESS] 请输入监听端口 (回车默认使用 443): " INPUT_V_PORT
         VLESS_PORT=${INPUT_V_PORT:-443}
-        echo -e "${BLUE}----------------------------------------------------------------------${NC}"
     fi
 
     if [[ "$MODE" == *"HY2"* ]] || [[ "$MODE" == *"ALL"* ]]; then
-        echo -e "${BOLD}[Hysteria 2] 设置 / Setup${NC}"
-        read -ep "   请输入 HY2 伪装 SNI (回车默认使用微软): " INPUT_H_SNI
+        read -ep "   [HY2] 请输入伪装 SNI (回车默认使用微软): " INPUT_H_SNI
         HY2_SNI=${INPUT_H_SNI:-$AUTO_REALITY}
-        read -ep "   请输入 HY2 监听端口 (回车默认使用标准 443): " INPUT_H_PORT
+        read -ep "   [HY2] 请输入监听端口 (回车默认使用 443): " INPUT_H_PORT
         HY2_PORT=${INPUT_H_PORT:-443}
-        echo -e "${BLUE}----------------------------------------------------------------------${NC}"
     fi
 
     if [[ "$MODE" == *"SS"* ]] || [[ "$MODE" == *"ALL"* ]]; then
-        echo -e "${BOLD}[Shadowsocks] 设置 / Setup${NC}"
-        read -ep "   请输入 SS 备用监听端口 (回车默认 2053): " INPUT_S_PORT
+        read -ep "   [SS] 请输入备用监听端口 (回车默认 2053): " INPUT_S_PORT
         SS_PORT=${INPUT_S_PORT:-2053}
     fi
     echo -e "${CYAN}======================================================================${NC}\n"
@@ -124,18 +116,19 @@ pre_install_setup() {
     VLESS_PORT=${VLESS_PORT:-443}; HY2_PORT=${HY2_PORT:-443}; SS_PORT=${SS_PORT:-2053}
 }
 
-# --- 物理层端口解锁引擎 ---
+# --- 物理层套接字核弹清理 (根治 bind error) ---
 release_ports() {
     echo -e "${YELLOW}[*] 正在执行内核级端口强制释放清理...${NC}"
     systemctl stop xray sing-box 2>/dev/null || true
-    # 强制核弹清理僵尸进程，解决 bind: address already in use (允许TCP和UDP各自绑定443)
+    killall -9 xray sing-box hysteria 2>/dev/null || true
+    
+    # 强制斩杀霸占目标端口的任何僵尸进程
     local ports_to_clean=($VLESS_PORT $HY2_PORT $SS_PORT 443 2053)
     for p in "${ports_to_clean[@]}"; do
-        fuser -k -9 ${p}/tcp 2>/dev/null
-        fuser -k -9 ${p}/udp 2>/dev/null
+        fuser -k -9 ${p}/tcp 2>/dev/null || true
+        fuser -k -9 ${p}/udp 2>/dev/null || true
     done
-    killall -9 xray sing-box hysteria 2>/dev/null || true
-    sleep 1
+    sleep 2
 }
 
 # --- [2] 部署逻辑 (Xray / Sing-box) ---
@@ -153,12 +146,14 @@ deploy_xray() {
     mkdir -p /usr/local/share/xray /usr/local/etc/xray; mv /tmp/geoip.dat /usr/local/share/xray/; mv /tmp/geosite.dat /usr/local/share/xray/
     
     PK=$(/usr/local/bin/xray x25519 | grep -i "Private" | awk '{print $NF}'); PBK=$(/usr/local/bin/xray x25519 | grep -i "Public" | awk '{print $NF}')
-    UUID=$(uuidgen); SHORT_ID=$(openssl rand -hex 4); SS_PASS=$(openssl rand -base64 16 | tr -d '\n\r'); HY2_PASS=$(openssl rand -base64 12 | tr -dc 'a-zA-Z0-9'); HY2_OBFS=$(openssl rand -base64 8 | tr -dc 'a-zA-Z0-9')
+    UUID=$(uuidgen); SHORT_ID=$(openssl rand -hex 4); SS_PASS=$(openssl rand -base64 16 | tr -d '\n\r')
+    HY2_PASS=$(openssl rand -base64 12 | tr -dc 'a-zA-Z0-9'); HY2_OBFS=$(openssl rand -base64 8 | tr -dc 'a-zA-Z0-9')
     
     mkdir -p /usr/local/etc/xray; openssl ecparam -genkey -name prime256v1 -out /usr/local/etc/xray/hy2.key 2>/dev/null
     openssl req -new -x509 -days 36500 -key /usr/local/etc/xray/hy2.key -out /usr/local/etc/xray/hy2.crt -subj "/CN=${HY2_SNI}" 2>/dev/null
 
-    JSON_VLESS='{ "listen": "0.0.0.0", "port": '$VLESS_PORT', "protocol": "vless", "settings": { "clients": [{"id": "'$UUID'", "flow": "xtls-rprx-vision"}], "decryption": "none" }, "streamSettings": { "network": "tcp", "security": "reality", "realitySettings": { "dest": "'$VLESS_SNI':443", "serverNames": ["'$VLESS_SNI'"], "privateKey": "'$PK'", "shortIds": ["'$SHORT_ID'"] } } }'
+    # 严格遵循 Xray 语法，VLESS (TCP) 和 HY2 (UDP) 同时监听 0.0.0.0
+    JSON_VLESS='{ "listen": "0.0.0.0", "port": '$VLESS_PORT', "protocol": "vless", "settings": { "clients": [{"id": "'$UUID'", "flow": "xtls-rprx-vision"}] }, "streamSettings": { "network": "tcp", "security": "reality", "realitySettings": { "dest": "'$VLESS_SNI':443", "serverNames": ["'$VLESS_SNI'"], "privateKey": "'$PK'", "shortIds": ["'$SHORT_ID'"] } } }'
     JSON_HY2='{ "listen": "0.0.0.0", "port": '$HY2_PORT', "protocol": "hysteria", "tag": "hy2-in", "settings": { "auth": "pass", "auth_str": "'$HY2_PASS'", "obfs": "salamander", "obfs_password": "'$HY2_OBFS'", "certificates": [{ "certificateFile": "/usr/local/etc/xray/hy2.crt", "keyFile": "/usr/local/etc/xray/hy2.key" }] } }'
     JSON_SS='{ "listen": "0.0.0.0", "port": '$SS_PORT', "protocol": "shadowsocks", "settings": { "method": "2022-blake3-aes-128-gcm", "password": "'$SS_PASS'", "network": "tcp,udp" } }'
 
@@ -168,15 +163,14 @@ deploy_xray() {
 { "log": { "loglevel": "warning" }, "inbounds": $INBOUNDS, "outbounds": [{ "protocol": "freedom" }] }
 EOF
 
-    IPT=$(command -v iptables || echo "/sbin/iptables"); IP6=$(command -v ip6tables || echo "/sbin/ip6tables")
-    
+    # 抑制 iptables 报错的封装处理
     cat > /etc/systemd/system/xray.service << SVC_EOF
 [Unit]
 After=network.target
 [Service]
-$(if [[ "$MODE" == *"HY2"* ]] || [[ "$MODE" == *"ALL"* ]]; then echo -e "ExecStartPre=-/bin/sh -c '$IPT -t nat -D PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports $HY2_PORT 2>/dev/null || true'\nExecStartPre=-/bin/sh -c '$IP6 -t nat -D PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports $HY2_PORT 2>/dev/null || true'\nExecStartPre=-$IPT -t nat -A PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports $HY2_PORT\nExecStartPre=-$IP6 -t nat -A PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports $HY2_PORT"; fi)
+$(if [[ "$MODE" == *"HY2"* ]] || [[ "$MODE" == *"ALL"* ]]; then echo -e "ExecStartPre=-/bin/sh -c '/sbin/iptables -t nat -D PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports $HY2_PORT 2>/dev/null || true'\nExecStartPre=-/bin/sh -c '/sbin/ip6tables -t nat -D PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports $HY2_PORT 2>/dev/null || true'\nExecStartPre=-/bin/sh -c '/sbin/iptables -t nat -A PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports $HY2_PORT 2>/dev/null || true'\nExecStartPre=-/bin/sh -c '/sbin/ip6tables -t nat -A PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports $HY2_PORT 2>/dev/null || true'"; fi)
 ExecStart=/usr/local/bin/xray run -config /usr/local/etc/xray/config.json
-$(if [[ "$MODE" == *"HY2"* ]] || [[ "$MODE" == *"ALL"* ]]; then echo -e "ExecStopPost=-/bin/sh -c '$IPT -t nat -D PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports $HY2_PORT 2>/dev/null || true'\nExecStopPost=-/bin/sh -c '$IP6 -t nat -D PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports $HY2_PORT 2>/dev/null || true'"; fi)
+$(if [[ "$MODE" == *"HY2"* ]] || [[ "$MODE" == *"ALL"* ]]; then echo -e "ExecStopPost=-/bin/sh -c '/sbin/iptables -t nat -D PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports $HY2_PORT 2>/dev/null || true'\nExecStopPost=-/bin/sh -c '/sbin/ip6tables -t nat -D PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports $HY2_PORT 2>/dev/null || true'"; fi)
 Restart=always
 LimitNOFILE=1048576
 LimitNPROC=infinity
@@ -185,7 +179,7 @@ WantedBy=multi-user.target
 SVC_EOF
 
     systemctl daemon-reload && systemctl enable --now xray; systemctl restart xray
-    sleep 2; systemctl is-active --quiet xray || { echo -e "${RED}[!] Xray 核心启动失败。${NC}"; journalctl -u xray --no-pager -n 20; exit 1; }
+    sleep 2; systemctl is-active --quiet xray || { echo -e "${RED}[!] 致命错误：Xray 核心启动失败！${NC}"; journalctl -u xray --no-pager -n 20; exit 1; }
 
     cat > /etc/ddr/.env << ENV_EOF
 CORE="xray"; MODE="$MODE"; UUID="$UUID"; VLESS_SNI="$VLESS_SNI"; VLESS_PORT="$VLESS_PORT"; HY2_SNI="$HY2_SNI"; HY2_PORT="$HY2_PORT"; SS_PORT="$SS_PORT"; PUBLIC_KEY="$PBK"; SHORT_ID="$SHORT_ID"; HY2_PASS="$HY2_PASS"; HY2_OBFS="$HY2_OBFS"; SS_PASS="$SS_PASS"; LINK_IP="$(curl -s4 api.ipify.org)"
@@ -204,7 +198,8 @@ deploy_singbox() {
     PK=$(/usr/local/bin/sing-box generate reality-keypair | grep -i "Private" | awk '{print $NF}'); PBK=$(/usr/local/bin/sing-box generate reality-keypair | grep -i "Public" | awk '{print $NF}')
     if [[ -z "$PK" ]]; then echo -e "${RED}[!] 核心不兼容 / Core incompatible.${NC}"; exit 1; fi
 
-    UUID=$(uuidgen); SHORT_ID=$(openssl rand -hex 4); SS_PASS=$(openssl rand -base64 16 | tr -d '\n\r'); HY2_PASS=$(openssl rand -base64 12 | tr -dc 'a-zA-Z0-9'); HY2_OBFS=$(openssl rand -base64 8 | tr -dc 'a-zA-Z0-9')
+    UUID=$(uuidgen); SHORT_ID=$(openssl rand -hex 4); SS_PASS=$(openssl rand -base64 16 | tr -d '\n\r')
+    HY2_PASS=$(openssl rand -base64 12 | tr -dc 'a-zA-Z0-9'); HY2_OBFS=$(openssl rand -base64 8 | tr -dc 'a-zA-Z0-9')
     
     mkdir -p /etc/sing-box; openssl ecparam -genkey -name prime256v1 -out /etc/sing-box/hy2.key 2>/dev/null
     openssl req -new -x509 -days 36500 -key /etc/sing-box/hy2.key -out /etc/sing-box/hy2.crt -subj "/CN=${HY2_SNI}" 2>/dev/null
@@ -219,15 +214,14 @@ deploy_singbox() {
 { "log": { "level": "warn" }, "inbounds": $INBOUNDS, "outbounds": [{ "type": "direct" }] }
 EOF
 
-    IPT=$(command -v iptables || echo "/sbin/iptables"); IP6=$(command -v ip6tables || echo "/sbin/ip6tables")
-
+    # 抑制 iptables 报错的封装处理
     cat > /etc/systemd/system/sing-box.service << SVC_EOF
 [Unit]
 After=network.target
 [Service]
-$(if [[ "$MODE" == *"HY2"* ]] || [[ "$MODE" == *"ALL"* ]]; then echo -e "ExecStartPre=-/bin/sh -c '$IPT -t nat -D PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports $HY2_PORT 2>/dev/null || true'\nExecStartPre=-/bin/sh -c '$IP6 -t nat -D PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports $HY2_PORT 2>/dev/null || true'\nExecStartPre=-$IPT -t nat -A PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports $HY2_PORT\nExecStartPre=-$IP6 -t nat -A PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports $HY2_PORT"; fi)
+$(if [[ "$MODE" == *"HY2"* ]] || [[ "$MODE" == *"ALL"* ]]; then echo -e "ExecStartPre=-/bin/sh -c '/sbin/iptables -t nat -D PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports $HY2_PORT 2>/dev/null || true'\nExecStartPre=-/bin/sh -c '/sbin/ip6tables -t nat -D PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports $HY2_PORT 2>/dev/null || true'\nExecStartPre=-/bin/sh -c '/sbin/iptables -t nat -A PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports $HY2_PORT 2>/dev/null || true'\nExecStartPre=-/bin/sh -c '/sbin/ip6tables -t nat -A PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports $HY2_PORT 2>/dev/null || true'"; fi)
 ExecStart=/usr/local/bin/sing-box run -c /etc/sing-box/config.json
-$(if [[ "$MODE" == *"HY2"* ]] || [[ "$MODE" == *"ALL"* ]]; then echo -e "ExecStopPost=-/bin/sh -c '$IPT -t nat -D PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports $HY2_PORT 2>/dev/null || true'\nExecStopPost=-/bin/sh -c '$IP6 -t nat -D PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports $HY2_PORT 2>/dev/null || true'"; fi)
+$(if [[ "$MODE" == *"HY2"* ]] || [[ "$MODE" == *"ALL"* ]]; then echo -e "ExecStopPost=-/bin/sh -c '/sbin/iptables -t nat -D PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports $HY2_PORT 2>/dev/null || true'\nExecStopPost=-/bin/sh -c '/sbin/ip6tables -t nat -D PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports $HY2_PORT 2>/dev/null || true'"; fi)
 Restart=always
 LimitNOFILE=1048576
 LimitNPROC=infinity
@@ -236,7 +230,7 @@ WantedBy=multi-user.target
 SVC_EOF
 
     systemctl daemon-reload && systemctl enable --now sing-box; systemctl restart sing-box
-    sleep 2; systemctl is-active --quiet sing-box || { echo -e "${RED}[!] 致命错误：Sing-box 无法启动。端口被占用或配置错误。${NC}"; journalctl -u sing-box --no-pager -n 20; exit 1; }
+    sleep 2; systemctl is-active --quiet sing-box || { echo -e "${RED}[!] 致命错误：Sing-box 无法启动。${NC}"; journalctl -u sing-box --no-pager -n 20; exit 1; }
 
     cat > /etc/ddr/.env << ENV_EOF
 CORE="singbox"; MODE="$MODE"; UUID="$UUID"; VLESS_SNI="$VLESS_SNI"; VLESS_PORT="$VLESS_PORT"; HY2_SNI="$HY2_SNI"; HY2_PORT="$HY2_PORT"; SS_PORT="$SS_PORT"; PUBLIC_KEY="$PBK"; SHORT_ID="$SHORT_ID"; HY2_PASS="$HY2_PASS"; HY2_OBFS="$HY2_OBFS"; SS_PASS="$SS_PASS"; LINK_IP="$(curl -s4 api.ipify.org)"
@@ -254,7 +248,7 @@ show_usage() {
     echo -e "     - Hysteria 2: 顶级 UDP 加速，内置 20000-50000 端口跳跃防封机制。"
     echo -e "     - SS-2022: 经典轻量级备用协议，兼顾全平台客户端兼容性。"
     echo -e "9.   流量监控: 设置每月流量上限(GB)，一旦超量将自动停止核心服务。"
-    echo -e "10.  网络诊断: 包含本机 IP 欺诈度/纯净度检测及全球基准测速。"
+    echo -e "10.  网络诊断: 包含本机 IP 欺诈度检测及全球基准测速。"
     echo -e "11.  VPS优化: 解除 Linux 最大连接数限制，开启 BBR-Brutal 加速。"
     echo -e "13.  节点参数: 随时查看当前已安装的配置信息及通用 URI 链接。"
     echo -e "14.  OTA更新: 一键同步 GitHub 最新版脚本代码并无损热更新。"
@@ -372,7 +366,7 @@ while true; do
     systemctl is-active --quiet xray && STATUS="${GREEN}Running (Xray)${NC}" || { systemctl is-active --quiet sing-box && STATUS="${CYAN}Running (Sing-box)${NC}" || STATUS="${RED}Stopped${NC}"; }
     source /etc/ddr/.env 2>/dev/null && CUR_MODE="[${CORE}-${MODE}]" || CUR_MODE=""
     
-    clear; echo -e "${BLUE}======================================================================${NC}\n${BOLD}${PURPLE}  Aio-box Ultimate Console [Apex V35 Ultimate] ${NC}\n${BLUE}======================================================================${NC}"
+    clear; echo -e "${BLUE}======================================================================${NC}\n${BOLD}${PURPLE}  Aio-box Ultimate Console [Apex V37 Ultimate] ${NC}\n${BLUE}======================================================================${NC}"
     echo -e " IP: ${YELLOW}$IPV4${NC} | STATUS: $STATUS $CUR_MODE\n${BLUE}----------------------------------------------------------------------${NC}"
     echo -e " ${YELLOW}[ Xray-core 部署 / Deploy ]${NC}       ${CYAN}[ Sing-box 部署 / Deploy ]${NC}"
     echo -e " ${GREEN}1.${NC} VLESS-Vision (REALITY)          ${GREEN}5.${NC} VLESS-Vision (REALITY)"
