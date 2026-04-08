@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ====================================================================
 # Aio-box Ultimate Console [Full Features | Shortcut 'sb']
-# Features: Dynamic GitHub Pull, Multi-SNI, Ghost NAT Clean, Protocol Fix
-# Version: 2026.04.Apex-Stable-V32-Ultimate
+# Features: Killall Socket Release, Multi-SNI, Custom Ports, Auto-Clean NAT
+# Version: 2026.04.Apex-Stable-V33-Ultimate
 # ====================================================================
 
 export DEBIAN_FRONTEND=noninteractive
@@ -34,17 +34,16 @@ setup_shortcut() {
 }
 
 check_env() {
-    if ! command -v jq >/dev/null || ! command -v vnstat >/dev/null || ! command -v iptables >/dev/null || ! command -v unzip >/dev/null; then
+    if ! command -v jq >/dev/null || ! command -v vnstat >/dev/null || ! command -v iptables >/dev/null || ! command -v unzip >/dev/null || ! command -v killall >/dev/null; then
         echo -e "${YELLOW}[*] 正在同步系统依赖环境... / Syncing dependencies...${NC}"
         apt-get update -y -q || yum makecache -y -q
-        local deps=(wget curl jq openssl uuid-runtime cron fail2ban python3 bc unzip vnstat iptables tar)
+        local deps=(wget curl jq openssl uuid-runtime cron fail2ban python3 bc unzip vnstat iptables tar psmisc)
         if command -v apt-get >/dev/null; then apt-get install -y -q "${deps[@]}"; else yum install -y -q "${deps[@]}"; fi
         systemctl enable cron vnstat 2>/dev/null || systemctl enable cronie vnstat 2>/dev/null
         systemctl start cron vnstat 2>/dev/null || systemctl start cronie vnstat 2>/dev/null
     fi
 }
 
-# --- 架构获取与 GitHub 官方源拉取 ---
 get_architecture() {
     local ARCH=$(uname -m)
     case "$ARCH" in
@@ -64,7 +63,6 @@ fetch_github_release() {
     local download_url=$(curl -sL "$api_url" | jq -r ".assets[] | select(.name | contains(\"$keyword\")) | .browser_download_url" | head -n 1)
     
     if [[ -z "$download_url" || "$download_url" == "null" ]]; then
-        # 尝试使用镜像代理解析 (应对 GitHub API 限制)
         download_url=$(curl -sL "https://ghp.ci/$api_url" | jq -r ".assets[] | select(.name | contains(\"$keyword\")) | .browser_download_url" | head -n 1)
     fi
 
@@ -101,7 +99,6 @@ pre_install_setup() {
     ASN_ORG=$(curl -sm3 "ipinfo.io/org" || echo "GENERIC")
     ASN_UPPER=$(echo "$ASN_ORG" | tr '[:lower:]' '[:upper:]')
     
-    # 强制规避 GCP/AWS 对自身域名的回环检测拦截
     if [[ "$ASN_UPPER" == *"GOOGLE"* || "$ASN_UPPER" == *"AMAZON"* || "$ASN_UPPER" == *"AWS"* ]]; then 
         AUTO_REALITY="www.microsoft.com"
     else 
@@ -117,7 +114,7 @@ pre_install_setup() {
         echo -e "${BOLD}[VLESS-Vision] 设置 / Setup${NC}"
         read -ep "   请输入 VLESS 伪装域名 SNI (回车默认使用推荐值): " INPUT_V_SNI
         VLESS_SNI=${INPUT_V_SNI:-$AUTO_REALITY}
-        read -ep "   请输入 VLESS 监听端口 (回车默认 443): " INPUT_V_PORT
+        read -ep "   【强烈建议】请输入 VLESS 监听非标高端口 (例如 8443, 回车默认 443): " INPUT_V_PORT
         VLESS_PORT=${INPUT_V_PORT:-443}
         echo -e "${BLUE}----------------------------------------------------------------------${NC}"
     fi
@@ -126,7 +123,7 @@ pre_install_setup() {
         echo -e "${BOLD}[Hysteria 2] 设置 / Setup${NC}"
         read -ep "   请输入 HY2 伪装域名 SNI (回车默认使用推荐值): " INPUT_H_SNI
         HY2_SNI=${INPUT_H_SNI:-$AUTO_REALITY}
-        read -ep "   请输入 HY2 监听端口 (回车默认 443): " INPUT_H_PORT
+        read -ep "   【强烈建议】请输入 HY2 监听非标高端口 (例如 54321, 回车默认 443): " INPUT_H_PORT
         HY2_PORT=${INPUT_H_PORT:-443}
         echo -e "${BLUE}----------------------------------------------------------------------${NC}"
     fi
@@ -145,7 +142,11 @@ pre_install_setup() {
 # --- [2] 部署逻辑 (Xray / Sing-box) ---
 deploy_xray() {
     local MODE=$1; clear; echo -e "${BOLD}${GREEN} 部署 Xray-core [$MODE] ${NC}"; check_env; pre_install_setup "$MODE"
-    systemctl disable --now sing-box 2>/dev/null || true; systemctl stop xray 2>/dev/null || true
+    
+    # 物理级强杀进程，释放套接字，防止 bind 冲突
+    systemctl stop xray sing-box 2>/dev/null || true
+    killall -9 xray sing-box 2>/dev/null || true
+    systemctl disable xray sing-box 2>/dev/null || true
     
     get_architecture
     fetch_github_release "XTLS/Xray-core" "Xray-linux-${XRAY_ARCH}.zip" "xray_core.zip"
@@ -162,7 +163,6 @@ deploy_xray() {
     mkdir -p /usr/local/etc/xray; openssl ecparam -genkey -name prime256v1 -out /usr/local/etc/xray/hy2.key 2>/dev/null
     openssl req -new -x509 -days 36500 -key /usr/local/etc/xray/hy2.key -out /usr/local/etc/xray/hy2.crt -subj "/CN=${HY2_SNI}" 2>/dev/null
 
-    # [Xray核心修复] 强制监听 0.0.0.0，修复 Hy2 的 json 格式映射，移除致错的 network: udp
     JSON_VLESS='{ "listen": "0.0.0.0", "port": '$VLESS_PORT', "protocol": "vless", "settings": { "clients": [{"id": "'$UUID'", "flow": "xtls-rprx-vision"}], "decryption": "none" }, "streamSettings": { "network": "tcp", "security": "reality", "realitySettings": { "dest": "'$VLESS_SNI':443", "serverNames": ["'$VLESS_SNI'"], "privateKey": "'$PK'", "shortIds": ["'$SHORT_ID'"] } } }'
     JSON_HY2='{ "listen": "0.0.0.0", "port": '$HY2_PORT', "protocol": "hysteria", "tag": "hy2-in", "settings": { "auth": "pass", "auth_str": "'$HY2_PASS'", "obfs": "salamander", "obfs_password": "'$HY2_OBFS'", "certificates": [{ "certificateFile": "/usr/local/etc/xray/hy2.crt", "keyFile": "/usr/local/etc/xray/hy2.key" }] } }'
     JSON_SS='{ "listen": "0.0.0.0", "port": '$SS_PORT', "protocol": "shadowsocks", "settings": { "method": "2022-blake3-aes-128-gcm", "password": "'$SS_PASS'", "network": "tcp,udp" } }'
@@ -190,7 +190,7 @@ WantedBy=multi-user.target
 SVC_EOF
 
     systemctl daemon-reload && systemctl enable --now xray; systemctl restart xray
-    sleep 2; systemctl is-active --quiet xray || { echo -e "${RED}[!] 致命错误：Xray 核心无法启动，配置语法或端口有误！${NC}"; journalctl -u xray --no-pager -n 20; exit 1; }
+    sleep 2; systemctl is-active --quiet xray || { echo -e "${RED}[!] 致命错误：Xray 核心无法启动，请检查端口是否被其他程序占用！${NC}"; journalctl -u xray --no-pager -n 20; exit 1; }
 
     cat > /etc/ddr/.env << ENV_EOF
 CORE="xray"
@@ -213,7 +213,11 @@ ENV_EOF
 
 deploy_singbox() {
     local MODE=$1; clear; echo -e "${BOLD}${GREEN} 部署 Sing-box [$MODE] ${NC}"; check_env; pre_install_setup "$MODE"
-    systemctl disable --now xray 2>/dev/null || true; systemctl stop sing-box 2>/dev/null || true
+    
+    # 物理级强杀进程，释放套接字，防止 bind: address already in use 冲突
+    systemctl stop xray sing-box 2>/dev/null || true
+    killall -9 xray sing-box 2>/dev/null || true
+    systemctl disable xray sing-box 2>/dev/null || true
 
     get_architecture
     fetch_github_release "SagerNet/sing-box" "linux-${SB_ARCH}.tar.gz" "singbox_core.tar.gz"
@@ -228,7 +232,6 @@ deploy_singbox() {
     mkdir -p /etc/sing-box; openssl ecparam -genkey -name prime256v1 -out /etc/sing-box/hy2.key 2>/dev/null
     openssl req -new -x509 -days 36500 -key /etc/sing-box/hy2.key -out /etc/sing-box/hy2.crt -subj "/CN=${HY2_SNI}" 2>/dev/null
 
-    # [Sing-box核心修复] 去除服务端的非法客户端指纹 (utls) 配置
     JSON_VLESS='{ "type": "vless", "listen": "::", "listen_port": '$VLESS_PORT', "tcp_fast_open": true, "users": [{"uuid": "'$UUID'", "flow": "xtls-rprx-vision"}], "tls": { "enabled": true, "server_name": "'$VLESS_SNI'", "reality": { "enabled": true, "handshake": { "server": "'$VLESS_SNI'", "server_port": 443 }, "private_key": "'$PK'", "short_id": ["'$SHORT_ID'"] } } }'
     JSON_HY2='{ "type": "hysteria2", "listen": "::", "listen_port": '$HY2_PORT', "up_mbps": 3000, "down_mbps": 3000, "obfs": { "type": "salamander", "password": "'$HY2_OBFS'" }, "users": [{"password": "'$HY2_PASS'"}], "tls": { "enabled": true, "certificate_path": "/etc/sing-box/hy2.crt", "key_path": "/etc/sing-box/hy2.key" } }'
     JSON_SS='{ "type": "shadowsocks", "listen": "::", "listen_port": '$SS_PORT', "tcp_fast_open": true, "method": "2022-blake3-aes-128-gcm", "password": "'$SS_PASS'" }'
@@ -256,7 +259,7 @@ WantedBy=multi-user.target
 SVC_EOF
 
     systemctl daemon-reload && systemctl enable --now sing-box; systemctl restart sing-box
-    sleep 2; systemctl is-active --quiet sing-box || { echo -e "${RED}[!] 致命错误：Sing-box 核心无法启动！${NC}"; journalctl -u sing-box --no-pager -n 20; exit 1; }
+    sleep 2; systemctl is-active --quiet sing-box || { echo -e "${RED}[!] 致命错误：Sing-box 核心无法启动，请检查端口是否被其他程序占用！${NC}"; journalctl -u sing-box --no-pager -n 20; exit 1; }
 
     cat > /etc/ddr/.env << ENV_EOF
 CORE="singbox"
@@ -327,6 +330,7 @@ VALUE=$(echo $TOTAL_TX | sed 's/[^0-9.]*//g')
 [[ "$TOTAL_TX" == *"T"* ]] && VALUE=$(echo "$VALUE * 1024" | bc)
 if (( $(echo "$VALUE >= $QUOTA_VAL" | bc -l) )); then
     systemctl stop xray sing-box 2>/dev/null
+    killall -9 xray sing-box 2>/dev/null || true
 fi
 EOF
         echo "$QUOTA_GB" > /etc/ddr/.quota_val; chmod +x /etc/ddr/quota.sh
@@ -390,12 +394,13 @@ clean_uninstall() {
     clear; echo -e "${RED}⚠️  卸载交互向导 / Uninstall Wizard${NC}\n 1. 仅删除核心与配置 / Remove core & config\n 2. 彻底抹除一切痕迹 / Complete purge"
     read -ep " 请选择 [1-2]: " clean_choice
     
-    systemctl disable --now xray sing-box 2>/dev/null || true
+    systemctl stop xray sing-box 2>/dev/null || true
+    killall -9 xray sing-box 2>/dev/null || true
+    systemctl disable xray sing-box 2>/dev/null || true
     
-    # [防拥堵修复] 强制物理循环清理所有幽灵端口映射
     local ipt_cmd=$(command -v iptables || echo "/sbin/iptables")
     local ip6t_cmd=$(command -v ip6tables || echo "/sbin/ip6tables")
-    local ports_to_clear="443 8443"
+    local ports_to_clear="443 8443 54321 2053"
     [[ -f /etc/ddr/.env ]] && source /etc/ddr/.env 2>/dev/null
     [[ -n "$VLESS_PORT" ]] && ports_to_clear="$ports_to_clear $VLESS_PORT"
     [[ -n "$HY2_PORT" ]] && ports_to_clear="$ports_to_clear $HY2_PORT"
