@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 # ====================================================================
-# Aio-box Ultimate Console [Virgin State Check Added & Optimized]
-# Version: 2026.04.Apex-Stable-V41-Perfect
+# Aio-box Ultimate Console [True 443 Coexistence & JSON Bug Fixed]
+# Version: 2026.04.Apex-Stable-V45-Perfect
 # ====================================================================
 
 export DEBIAN_FRONTEND=noninteractive
 RED='\033[0;31m' GREEN='\033[0;32m' YELLOW='\033[0;33m' BLUE='\033[0;36m' PURPLE='\033[0;35m' CYAN='\033[0;36m' NC='\033[0m' BOLD='\033[1m'
 
-# --- [0] 自动提权 ---
 if [[ $EUID -ne 0 ]]; then
     if command -v sudo >/dev/null 2>&1; then
         exec sudo bash "$0" "$@"
@@ -17,7 +16,6 @@ if [[ $EUID -ne 0 ]]; then
 fi
 sed -i '/acme.sh.env/d' ~/.bashrc >/dev/null 2>&1 || true
 
-# --- [1] 本地化快捷指令与环境 ---
 setup_shortcut() {
     mkdir -p /etc/ddr
     if [[ ! -f /etc/ddr/aio.sh || "$1" == "update" ]]; then
@@ -115,7 +113,6 @@ pre_install_setup() {
     VLESS_PORT=${VLESS_PORT:-443}; HY2_PORT=${HY2_PORT:-443}; SS_PORT=${SS_PORT:-2053}
 }
 
-# --- 物理层套接字强制绞杀 ---
 release_ports() {
     echo -e "${YELLOW}[*] 正在执行内核级端口强制释放清理...${NC}"
     systemctl stop xray sing-box hysteria 2>/dev/null || true
@@ -130,9 +127,6 @@ release_ports() {
     sleep 2
 }
 
-# ====================================================================
-# [2] 部署逻辑 (Xray / Sing-box)
-# ====================================================================
 deploy_xray() {
     local MODE=$1; clear; echo -e "${BOLD}${GREEN} 部署 Xray-core [$MODE] ${NC}"; check_env; pre_install_setup "$MODE"
     release_ports
@@ -168,8 +162,7 @@ EOF
     {
       "listen": "0.0.0.0", "port": ${HY2_PORT}, "protocol": "hysteria", "tag": "hy2-in",
       "settings": {
-        "auth": "pass", "auth_str": "${HY2_PASS}", "obfs": "salamander", "obfs_password": "${HY2_OBFS}",
-        "certificates": [{ "certificateFile": "/usr/local/etc/xray/hy2.crt", "keyFile": "/usr/local/etc/xray/hy2.key" }]
+        "auth": "pass", "auth_str": "${HY2_PASS}", "certificates": [{ "certificateFile": "/usr/local/etc/xray/hy2.crt", "keyFile": "/usr/local/etc/xray/hy2.key" }]
       }
     }
 EOF
@@ -295,9 +288,6 @@ ENV_EOF
     view_config "deploy"
 }
 
-# ====================================================================
-# [3] 系统维护功能
-# ====================================================================
 show_usage() {
     clear; echo -e "${CYAN}======================================================================${NC}"
     echo -e "${BOLD}${GREEN}   Aio-box Ultimate 脚本详细功能与使用说明${NC}"
@@ -370,10 +360,14 @@ view_config() {
     echo -e "${BOLD}Engine:${NC} $CORE | ${BOLD}Mode:${NC} $MODE\n${BLUE}----------------------------------------------------------------------${NC}"
     
     if [[ "$MODE" == *"VLESS"* ]] || [[ "$MODE" == *"ALL"* ]]; then
-        echo -e "${YELLOW}[ VLESS-Vision 通用链接 ]${NC}\nvless://$UUID@$LINK_IP:$VLESS_PORT?encryption=none&flow=xtls-rprx-vision&security=reality&sni=$VLESS_SNI&fp=chrome&pbk=$PUBLIC_KEY&sid=$SHORT_ID&type=tcp#Aio-VLESS\n"
+        echo -e "${YELLOW}[ VLESS-Vision 通用链接 ]${NC}\n(注: 小火箭务必将 uTLS 设置为 chrome, 否则秒被服务端断开)\nvless://$UUID@$LINK_IP:$VLESS_PORT?encryption=none&flow=xtls-rprx-vision&security=reality&sni=$VLESS_SNI&fp=chrome&pbk=$PUBLIC_KEY&sid=$SHORT_ID&type=tcp#Aio-VLESS\n"
     fi
     if [[ "$MODE" == *"HY2"* ]] || [[ "$MODE" == *"ALL"* ]]; then
-        echo -e "${YELLOW}[ Hysteria 2 通用链接 ]${NC}\n(注: iOS小火箭请务必开启\"允许不安全\"或\"跳过证书验证\")\nhysteria2://$HY2_PASS@$LINK_IP:$HY2_PORT/?insecure=1&sni=$HY2_SNI&alpn=h3&obfs=salamander&obfs-password=$HY2_OBFS&mport=20000-50000#Aio-Hy2\n"
+        if [[ "$CORE" == "xray" ]]; then
+             echo -e "${YELLOW}[ Hysteria 2 通用链接 ]${NC}\n(注: 小火箭务必开启 \"允许不安全\" 或 \"跳过证书验证\")\nhysteria2://$HY2_PASS@$LINK_IP:$HY2_PORT/?insecure=1&sni=$HY2_SNI&alpn=h3&mport=20000-50000#Aio-Hy2\n"
+        else
+             echo -e "${YELLOW}[ Hysteria 2 通用链接 ]${NC}\n(注: 小火箭务必开启 \"允许不安全\" 或 \"跳过证书验证\")\nhysteria2://$HY2_PASS@$LINK_IP:$HY2_PORT/?insecure=1&sni=$HY2_SNI&alpn=h3&obfs=salamander&obfs-password=$HY2_OBFS&mport=20000-50000#Aio-Hy2\n"
+        fi
     fi
     if [[ "$MODE" == *"SS"* ]] || [[ "$MODE" == *"ALL"* ]]; then
         SS_BASE64=$(echo -n "2022-blake3-aes-128-gcm:${SS_PASS}" | base64 -w 0 2>/dev/null || echo -n "2022-blake3-aes-128-gcm:${SS_PASS}" | base64 | tr -d '\n')
@@ -386,7 +380,6 @@ view_config() {
     read -ep "按回车返回主菜单..."
 }
 
-# --- 终极核弹级卸载引擎 ---
 clean_uninstall() {
     clear; echo -e "${RED}⚠️  核弹级卸载交互向导 / Nuclear Uninstall Wizard${NC}\n 1. 仅删除核心与配置 / Remove core & config\n 2. 彻底物理清场 (恢复处女态) / Complete Purge"
     read -ep " 请选择 [1-2]: " clean_choice
@@ -475,16 +468,13 @@ check_virgin_state() {
     read -ep "按回车返回主菜单..."
 }
 
-# ====================================================================
-# [4] 主控制台循环
-# ====================================================================
 setup_shortcut
 while true; do
     IPV4=$(curl -s4m3 api.ipify.org || echo "N/A"); PUBLIC_IP="$IPV4"
     systemctl is-active --quiet xray && STATUS="${GREEN}Running (Xray)${NC}" || { systemctl is-active --quiet sing-box && STATUS="${CYAN}Running (Sing-box)${NC}" || STATUS="${RED}Stopped${NC}"; }
     source /etc/ddr/.env 2>/dev/null && CUR_MODE="[${CORE}-${MODE}]" || CUR_MODE=""
     
-    clear; echo -e "${BLUE}======================================================================${NC}\n${BOLD}${PURPLE}  Aio-box Ultimate Console [Apex V41 Perfect] ${NC}\n${BLUE}======================================================================${NC}"
+    clear; echo -e "${BLUE}======================================================================${NC}\n${BOLD}${PURPLE}  Aio-box Ultimate Console [Apex V45 Perfect] ${NC}\n${BLUE}======================================================================${NC}"
     echo -e " IP: ${YELLOW}$IPV4${NC} | STATUS: $STATUS $CUR_MODE\n${BLUE}----------------------------------------------------------------------${NC}"
     echo -e " ${YELLOW}[ Xray-core 部署 / Deploy ]${NC}       ${CYAN}[ Sing-box 部署 / Deploy ]${NC}"
     echo -e " ${GREEN}1.${NC} VLESS-Vision (REALITY)          ${GREEN}5.${NC} VLESS-Vision (REALITY)"
