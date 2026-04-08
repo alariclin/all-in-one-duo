@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ====================================================================
 # Aio-box Ultimate Console [Full Features | Shortcut 'sb']
-# Features: Multi-SNI, Custom Ports, Auto-Clean NAT, Usage Guide
-# Version: 2026.04.Apex-Stable-V28-Ultimate
+# Features: Multi-SNI, Custom Ports, Auto-Clean NAT, Native GitHub Pull
+# Version: 2026.04.Apex-Stable-V30-Ultimate
 # ====================================================================
 
 export DEBIAN_FRONTEND=noninteractive
@@ -19,7 +19,6 @@ if [[ $EUID -ne 0 ]]; then
     fi
 fi
 sed -i '/acme.sh.env/d' ~/.bashrc >/dev/null 2>&1 || true
-USER_MIRROR_BASE="https://raw.githubusercontent.com/alariclin/aio-box/main/core"
 
 # --- [1] 本地化快捷指令与环境准备 ---
 setup_shortcut() {
@@ -35,29 +34,65 @@ setup_shortcut() {
 }
 
 check_env() {
-    if ! command -v jq >/dev/null || ! command -v vnstat >/dev/null || ! command -v iptables >/dev/null; then
+    if ! command -v jq >/dev/null || ! command -v vnstat >/dev/null || ! command -v iptables >/dev/null || ! command -v unzip >/dev/null; then
         echo -e "${YELLOW}[*] 正在同步系统依赖环境... / Syncing dependencies...${NC}"
         apt-get update -y -q || yum makecache -y -q
-        local deps=(wget curl jq openssl uuid-runtime cron fail2ban python3 bc unzip vnstat iptables)
+        local deps=(wget curl jq openssl uuid-runtime cron fail2ban python3 bc unzip vnstat iptables tar)
         if command -v apt-get >/dev/null; then apt-get install -y -q "${deps[@]}"; else yum install -y -q "${deps[@]}"; fi
         systemctl enable cron vnstat 2>/dev/null || systemctl enable cronie vnstat 2>/dev/null
         systemctl start cron vnstat 2>/dev/null || systemctl start cronie vnstat 2>/dev/null
     fi
 }
 
-fetch_core() {
-    local file_name=$1; local official_url=$2; local cache_dir="/etc/ddr/.core_cache"
-    mkdir -p "$cache_dir"
-    [[ -f "${cache_dir}/${file_name}" ]] && { cp "${cache_dir}/${file_name}" "/tmp/${file_name}"; return 0; }
-    echo -e "${YELLOW} -> 拉取资源 / Fetching: [${file_name}]...${NC}"
-    local mirrors=("" "https://ghp.ci/" "https://ghproxy.net/" "https://mirror.ghproxy.com/")
+# --- 架构获取与 GitHub 官方源拉取 ---
+get_architecture() {
+    local ARCH=$(uname -m)
+    case "$ARCH" in
+        x86_64) XRAY_ARCH="64"; SB_ARCH="amd64" ;;
+        aarch64) XRAY_ARCH="arm64-v8a"; SB_ARCH="arm64" ;;
+        *) echo -e "${RED}[!] 不支持的架构: $ARCH${NC}"; exit 1 ;;
+    esac
+}
+
+fetch_github_release() {
+    local repo=$1
+    local keyword=$2
+    local output_file=$3
+    echo -e "${YELLOW} -> 正在从 GitHub 官方仓库获取最新版本 [${repo}]...${NC}"
+    
+    # 使用 GitHub API 获取最新 Release 的下载链接
+    local api_url="https://api.github.com/repos/${repo}/releases/latest"
+    local download_url=$(curl -sL "$api_url" | grep "browser_download_url" | grep -i "$keyword" | head -n 1 | cut -d '"' -f 4)
+    
+    if [[ -z "$download_url" ]]; then
+        echo -e "${RED}[!] 无法获取 $repo 的最新下载链接。可能是 API 限制或架构不匹配。${NC}"
+        # 尝试使用镜像代理解析
+        download_url=$(curl -sL "https://ghp.ci/$api_url" | grep "browser_download_url" | grep -i "$keyword" | head -n 1 | cut -d '"' -f 4)
+        if [[ -z "$download_url" ]]; then exit 1; fi
+    fi
+
+    echo -e "${GREEN} -> 下载链接: ${download_url}${NC}"
+    local mirrors=("" "https://ghp.ci/" "https://ghproxy.net/")
     for mirror in "${mirrors[@]}"; do
-        if curl -fLs --connect-timeout 10 "${mirror}${official_url}" -o "/tmp/${file_name}" && [[ -s "/tmp/${file_name}" ]]; then
-            cp "/tmp/${file_name}" "${cache_dir}/${file_name}"; return 0
+        if curl -fLs --connect-timeout 10 "${mirror}${download_url}" -o "/tmp/${output_file}" && [[ -s "/tmp/${output_file}" ]]; then
+            echo -e "${GREEN}   ✔ 获取成功！${NC}"
+            return 0
         fi
     done
-    curl -fLs --connect-timeout 10 "${USER_MIRROR_BASE}/${file_name}" -o "/tmp/${file_name}" && [[ -s "/tmp/${file_name}" ]] && { cp "/tmp/${file_name}" "${cache_dir}/${file_name}"; return 0; }
-    echo -e "${RED}[!] 下载彻底失败 / Fetch failed.${NC}"; exit 1
+    echo -e "${RED}[!] 下载失败。${NC}"; exit 1
+}
+
+fetch_geo_data() {
+    local file_name=$1
+    local official_url=$2
+    echo -e "${YELLOW} -> 拉取 Geo 数据库: [${file_name}]...${NC}"
+    local mirrors=("" "https://ghp.ci/" "https://ghproxy.net/")
+    for mirror in "${mirrors[@]}"; do
+        if curl -fLs --connect-timeout 10 "${mirror}${official_url}" -o "/tmp/${file_name}" && [[ -s "/tmp/${file_name}" ]]; then
+            return 0
+        fi
+    done
+    echo -e "${RED}[!] Geo 数据下载失败。${NC}"; exit 1
 }
 
 pre_install_setup() {
@@ -99,7 +134,6 @@ pre_install_setup() {
     fi
     echo -e "${CYAN}======================================================================${NC}\n"
 
-    # 安全回退校验
     VLESS_SNI=${VLESS_SNI:-$AUTO_REALITY}; HY2_SNI=${HY2_SNI:-$AUTO_REALITY}
     VLESS_PORT=${VLESS_PORT:-443}; HY2_PORT=${HY2_PORT:-443}; SS_PORT=${SS_PORT:-2053}
 }
@@ -109,12 +143,14 @@ deploy_xray() {
     local MODE=$1; clear; echo -e "${BOLD}${GREEN} 部署 Xray-core [$MODE] ${NC}"; check_env; pre_install_setup "$MODE"
     systemctl disable --now sing-box 2>/dev/null || true; systemctl stop xray 2>/dev/null || true
     
-    XRAY_VER="v26.3.27"; ARCH=$(uname -m | sed 's/x86_64/64/;s/aarch64/arm64-v8a/')
-    fetch_core "Xray-linux-${ARCH}.zip" "https://github.com/XTLS/Xray-core/releases/download/${XRAY_VER}/Xray-linux-${ARCH}.zip"
-    fetch_core "geoip.dat" "https://github.com/v2fly/geoip/releases/latest/download/geoip.dat"
-    fetch_core "geosite.dat" "https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat"
+    get_architecture
     
-    rm -rf /tmp/xray_ext; unzip -qo "/tmp/Xray-linux-${ARCH}.zip" -d /tmp/xray_ext
+    # 从 GitHub 官方仓库动态拉取最新版本
+    fetch_github_release "XTLS/Xray-core" "Xray-linux-${XRAY_ARCH}.zip" "xray_core.zip"
+    fetch_geo_data "geoip.dat" "https://github.com/v2fly/geoip/releases/latest/download/geoip.dat"
+    fetch_geo_data "geosite.dat" "https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat"
+    
+    rm -rf /tmp/xray_ext; unzip -qo "/tmp/xray_core.zip" -d /tmp/xray_ext
     mv /tmp/xray_ext/xray /usr/local/bin/xray; chmod +x /usr/local/bin/xray
     mkdir -p /usr/local/share/xray /usr/local/etc/xray; mv /tmp/geoip.dat /usr/local/share/xray/; mv /tmp/geosite.dat /usr/local/share/xray/
     
@@ -124,6 +160,7 @@ deploy_xray() {
     mkdir -p /usr/local/etc/xray; openssl ecparam -genkey -name prime256v1 -out /usr/local/etc/xray/hy2.key 2>/dev/null
     openssl req -new -x509 -days 36500 -key /usr/local/etc/xray/hy2.key -out /usr/local/etc/xray/hy2.crt -subj "/CN=${HY2_SNI}" 2>/dev/null
 
+    # 深度架构修复：显式强制绑定 0.0.0.0 避免端口冲突，修复 Hy2 的 JSON 映射
     JSON_VLESS='{ "listen": "0.0.0.0", "port": '$VLESS_PORT', "protocol": "vless", "settings": { "clients": [{"id": "'$UUID'", "flow": "xtls-rprx-vision"}], "decryption": "none" }, "streamSettings": { "network": "tcp", "security": "reality", "realitySettings": { "dest": "'$VLESS_SNI':443", "serverNames": ["'$VLESS_SNI'"], "privateKey": "'$PK'", "shortIds": ["'$SHORT_ID'"] } } }'
     JSON_HY2='{ "listen": "0.0.0.0", "port": '$HY2_PORT', "protocol": "hysteria", "tag": "hy2-in", "settings": { "version": 2, "obfs": "salamander", "obfsPassword": "'$HY2_OBFS'", "certificateFile": "/usr/local/etc/xray/hy2.crt", "keyFile": "/usr/local/etc/xray/hy2.key", "clients": [{"password": "'$HY2_PASS'"}] }, "streamSettings": { "network": "udp" } }'
     JSON_SS='{ "listen": "0.0.0.0", "port": '$SS_PORT', "protocol": "shadowsocks", "settings": { "method": "2022-blake3-aes-128-gcm", "password": "'$SS_PASS'", "network": "tcp,udp" } }'
@@ -176,9 +213,12 @@ deploy_singbox() {
     local MODE=$1; clear; echo -e "${BOLD}${GREEN} 部署 Sing-box [$MODE] ${NC}"; check_env; pre_install_setup "$MODE"
     systemctl disable --now xray 2>/dev/null || true; systemctl stop sing-box 2>/dev/null || true
 
-    SB_VER="1.13.6"; ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
-    fetch_core "sing-box-${SB_VER}-linux-${ARCH}.tar.gz" "https://github.com/SagerNet/sing-box/releases/download/v${SB_VER}/sing-box-${SB_VER}-linux-${ARCH}.tar.gz"
-    tar -xzf "/tmp/sing-box-${SB_VER}-linux-${ARCH}.tar.gz" -C /tmp; mv /tmp/sing-box-*/sing-box /usr/local/bin/; chmod +x /usr/local/bin/sing-box
+    get_architecture
+    
+    # 从 GitHub 官方仓库动态拉取最新版本 (排除 alpha/beta，寻找 stable)
+    fetch_github_release "SagerNet/sing-box" "linux-${SB_ARCH}.tar.gz" "singbox_core.tar.gz"
+    
+    tar -xzf "/tmp/singbox_core.tar.gz" -C /tmp; mv /tmp/sing-box-*/sing-box /usr/local/bin/; chmod +x /usr/local/bin/sing-box
 
     PK=$(/usr/local/bin/sing-box generate reality-keypair | grep -i "Private" | awk '{print $NF}'); PBK=$(/usr/local/bin/sing-box generate reality-keypair | grep -i "Public" | awk '{print $NF}')
     if [[ -z "$PK" ]]; then echo -e "${RED}[!] 核心不兼容 / Core incompatible.${NC}"; exit 1; fi
@@ -188,7 +228,7 @@ deploy_singbox() {
     mkdir -p /etc/sing-box; openssl ecparam -genkey -name prime256v1 -out /etc/sing-box/hy2.key 2>/dev/null
     openssl req -new -x509 -days 36500 -key /etc/sing-box/hy2.key -out /etc/sing-box/hy2.crt -subj "/CN=${HY2_SNI}" 2>/dev/null
 
-    # 修复漏洞：去除了非法的服务端 "utls" 字段，保障 Sing-box 严格配置解析通过
+    # 修复漏洞：去除了非法的服务端 "utls" 字段
     JSON_VLESS='{ "type": "vless", "listen": "::", "listen_port": '$VLESS_PORT', "tcp_fast_open": true, "users": [{"uuid": "'$UUID'", "flow": "xtls-rprx-vision"}], "tls": { "enabled": true, "server_name": "'$VLESS_SNI'", "reality": { "enabled": true, "handshake": { "server": "'$VLESS_SNI'", "server_port": 443 }, "private_key": "'$PK'", "short_id": ["'$SHORT_ID'"] } } }'
     JSON_HY2='{ "type": "hysteria2", "listen": "::", "listen_port": '$HY2_PORT', "up_mbps": 3000, "down_mbps": 3000, "obfs": { "type": "salamander", "password": "'$HY2_OBFS'" }, "users": [{"password": "'$HY2_PASS'"}], "tls": { "enabled": true, "certificate_path": "/etc/sing-box/hy2.crt", "key_path": "/etc/sing-box/hy2.key" } }'
     JSON_SS='{ "type": "shadowsocks", "listen": "::", "listen_port": '$SS_PORT', "tcp_fast_open": true, "method": "2022-blake3-aes-128-gcm", "password": "'$SS_PASS'" }'
@@ -352,7 +392,6 @@ clean_uninstall() {
     
     systemctl disable --now xray sing-box 2>/dev/null || true
     
-    # [核心修复] 强制物理循环清理所有潜在的端口跳跃残留防火墙规则，绝不依赖 Systemd 钩子
     local ipt_cmd=$(command -v iptables || echo "/sbin/iptables")
     local ip6t_cmd=$(command -v ip6tables || echo "/sbin/ip6tables")
     local ports_to_clear="443 8443"
@@ -383,7 +422,7 @@ while true; do
     systemctl is-active --quiet xray && STATUS="${GREEN}Running (Xray)${NC}" || { systemctl is-active --quiet sing-box && STATUS="${CYAN}Running (Sing-box)${NC}" || STATUS="${RED}Stopped${NC}"; }
     source /etc/ddr/.env 2>/dev/null && CUR_MODE="[${CORE}-${MODE}]" || CUR_MODE=""
     
-    clear; echo -e "${BLUE}======================================================================${NC}\n${BOLD}${PURPLE}  Aio-box Ultimate Console [Apex V28 Ultimate] ${NC}\n${BLUE}======================================================================${NC}"
+    clear; echo -e "${BLUE}======================================================================${NC}\n${BOLD}${PURPLE}  Aio-box Ultimate Console [Apex V30 Ultimate] ${NC}\n${BLUE}======================================================================${NC}"
     echo -e " IP: ${YELLOW}$IPV4${NC} | STATUS: $STATUS $CUR_MODE\n${BLUE}----------------------------------------------------------------------${NC}"
     echo -e " ${YELLOW}[ Xray-core 部署 / Deploy ]${NC}       ${CYAN}[ Sing-box 部署 / Deploy ]${NC}"
     echo -e " ${GREEN}1.${NC} VLESS-Vision (REALITY)          ${GREEN}5.${NC} VLESS-Vision (REALITY)"
