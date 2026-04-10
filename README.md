@@ -153,15 +153,15 @@ Once installation is complete, simply enter the following command in the termina
 sb
 ```
 ---
-### 📋Panel Menu Overview：
-* 1-10: Core Architecture Orchestration - Mirror-level deployment options for Xray-core (1-5) and Sing-box (6-10).
-* 11: System Benchmark & IP Audit - Invokes bench.sh and Check.Place for deep quality scoring.
-* 12: VPS One-Click Tuning - Injects BBR and elevates kernel handles to million-level concurrency.
-* 13: Node Parameter Display - Exports current topology in Plaintext, URI Links, and Clash Meta YAML formats.
-* 14: User Manual - Detailed guidance on VLESS-Vision fingerprint alignment and Hy2 certificate immunity.
-* 15: Script OTA Update - Bypasses local cache to hot-load the latest source code from GitHub Master branch.
-* 16: One-Click Uninstall - Executes defensive uninstallation, physically destroying all remnants and rolling back the system.
-* 17: Environment Initialization (Auto-Fix) - Scans for port deadlocks, clears dirty routes, and tests connectivity.
+### 📋 Panel Menu Overview:
+* **1-10**: Core Architecture Orchestration - Mirror-level deployment options for Xray-core (1-5) and Sing-box (6-10).
+* **11**: System Benchmark & IP Audit - Invokes bench.sh and Check.Place for deep quality scoring.
+* **12**: VPS One-Click Tuning - Injects BBR and elevates kernel handles to million-level concurrency.
+* **13**: Node Parameter Display - Exports current topology in Plaintext, URI Links, and Clash Meta YAML formats.
+* **14**: User Manual - Detailed guidance on VLESS-Vision fingerprint alignment and Hy2 certificate immunity.
+* **15**: Script OTA Update - Bypasses local cache to hot-load the latest source code from GitHub Master branch.
+* **16**: One-Click Uninstall - Executes defensive uninstallation, physically destroying all remnants and rolling back the system.
+* **17**: Environment Initialization (Auto-Fix) - Scans for port deadlocks, clears dirty routes, and tests connectivity.
 
 ---
 <a name="-frequently-asked-questions-faq"></a>
@@ -179,13 +179,13 @@ sb
 ---
 
 ## 💻 系统要求 / System Requirements
-* OS: Debian 10+, Ubuntu 20.04+, CentOS 8+, AlmaLinux, Rocky Linux, Alpine Linux (Full Support).
-*Init System: Systemd or OpenRC is strictly required for daemon persistence.
-*Network: Dual-stack IPv4 / IPv6 resolution fully supported.
+* **OS**: Debian 10+, Ubuntu 20.04+, CentOS 8+, AlmaLinux, Rocky Linux, Alpine Linux (Full Support).
+* **Init System**: Systemd or OpenRC is strictly required for daemon persistence.
+* **Network**: Dual-stack IPv4 / IPv6 resolution fully supported.
 
 ## 🤝 反馈与交流 / Feedback & Support
 If you encounter any issues or have suggestions, please submit them via:
 * [GitHub Issues](https://github.com/alariclin/aio-box/issues)
 
 ## 📄 许可证 / License
-Released under the[MIT License](https://opensource.org/licenses/MIT).Copyright © 2026.
+Released under the [MIT License](https://opensource.org/licenses/MIT). Copyright © 2026.
