@@ -102,7 +102,8 @@ sb
 <a name="-english-description"></a>
 ## 🌐 Project Introduction
 
-**Aio-box** is an automated operations environment focused on Linux server network configuration, security hardening, and routing optimization. This project aims to resolve concurrency and conflict issues between heterogeneous network protocol stacks on the same host through high-fidelity automation scripts. With built-in kernel-level parameter tuning and a pioneering "White-box Self-Healing" mechanism, it serves as an ideal scaffold for network security research, full-stack technical testing, and automated DevOps management.
+**Aio-box** is an automated operations and maintenance environment dedicated to network environment configuration, security hardening, and routing optimization for Linux servers. This project aims to resolve concurrency and conflict issues of heterogeneous network protocol stacks on the same host machine through high-fidelity automation scripts.
+With built-in extreme system parameter tuning and an original "white-box self-healing" mechanism, it serves as an excellent scaffolding for cybersecurity research, full-stack technical testing, and automated DevOps management
 
 > **⚠️ Compliance & Disclaimer**: This project is intended strictly for network architecture research, cryptographic protocol study, and technical exchange. Use for any illegal purposes is strictly prohibited. Users must strictly comply with the laws and regulations of their respective jurisdictions. The user bears full responsibility for any direct or indirect consequences arising from improper use.
 
