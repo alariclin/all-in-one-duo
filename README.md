@@ -68,7 +68,7 @@ sb
 
 
 
-# 📦 Aio-box Ultimate Console
+# 📦 Aio-box
 
 - **致谢 / Credits:** We express our deepest gratitude to the excellent open-source network routing and encryption projects (such as Xray-core, Sing-box, Hysteria, etc.) for providing the underlying technical inspiration and support. This project is an independent tool designed for technical learning and automated operations.
 
