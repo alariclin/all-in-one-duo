@@ -96,19 +96,6 @@ sb
 ---
 
 <a name="-english-description"></a>
-
-
-# 📦 Aio-box
-
-- **Credits:** We express our deepest gratitude to the excellent open-source network routing and encryption projects (such as Xray-core, Sing-box, Hysteria, etc.) for providing the underlying technical inspiration and support. This project is an independent tool designed for technical learning and automated operations.
-
-[![Version](https://img.shields.io/badge/Version-Apex_V56-success.svg?style=flat-square)]()
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT)
-[![GitHub Stars](https://img.shields.io/github/stars/alariclin/aio-box?style=flat-square&color=yellow)](https://github.com/alariclin/aio-box/stargazers)
-[![GitHub Forks](https://img.shields.io/github/forks/alariclin/aio-box?style=flat-square&color=orange)](https://github.com/alariclin/aio-box/network/members)
-
----
-
 ## 🌐 Project Introduction
 
 **Aio-box** is an enterprise-grade automated operations environment focused on Linux server network configuration, security hardening, and routing optimization. This project aims to resolve concurrency and conflict issues between heterogeneous network protocol stacks on the same host through high-fidelity automation scripts. With built-in kernel-level parameter tuning and a pioneering "White-box Self-Healing" mechanism, it serves as an ideal scaffold for network security research, full-stack technical testing, and automated DevOps management.
