@@ -988,7 +988,7 @@ while true; do
     echo -e " ${GREEN}2.${NC} Shadowsocks-2022              ${GREEN}7.${NC} Shadowsocks-2022"
     echo -e " ${GREEN}3.${NC} VLESS + SS-2022               ${GREEN}8.${NC} VLESS + SS-2022"
     echo -e " ${GREEN}4.${NC} Hysteria 2 (Apernet)          ${GREEN}9.${NC} Hysteria 2 (聚合版)"
-    echo -e " ${GREEN}5.${NC} 全协议三合一/all (Xray+Hy2)    ${GREEN}10.${NC} 全协议三合一/all (Sing-box)"
+    echo -e " ${GREEN}5.${NC} 全协议三合一/all (Xray+Hy2)   ${GREEN}10.${NC} 全协议三合一/all (Sing-box)"
     echo -e "${BLUE}----------------------------------------------------------------------${NC}"
     echo -e " ${GREEN}11.${NC} 本机配置与IP测速纯净度 / The purity of local configuration and IP speed test"
     echo -e " ${GREEN}12.${NC} VPS一键优化（bbr） / One-click VPS Optimization (BBR)"
