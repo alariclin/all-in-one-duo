@@ -52,7 +52,7 @@ init_system_environment() {
         exit 1
     fi
 
-    if ! command -v jq >/dev/null || ! command -v fuser >/dev/null || ! command -v unzip >/dev/null || ! command -v qrencode >/dev/null || ! command -v iptables >/dev/null; then
+    if ! command -v jq >/dev/null || ! command -v fuser >/dev/null || ! command -v unzip >/dev/null || ! command -v qrencode >/dev/null || ! command -v iptables >/dev/null || ! command -v ss >/dev/null; then
         echo -e "${YELLOW}[*] 正在同步系统依赖环境 / Syncing dependencies (OS: ${release}, Init: ${INIT_SYS})...${NC}"
         
         if [[ "${release}" == "ubuntu" || "${release}" == "debian" ]]; then
@@ -68,9 +68,9 @@ init_system_environment() {
         if [[ "${release}" == "ubuntu" || "${release}" == "debian" ]]; then
             deps+=(cron uuid-runtime iptables-persistent netfilter-persistent fail2ban)
         elif [[ "${release}" == "centos" ]]; then
-            deps+=(cronie util-linux bind-utils firewalld)
+            deps+=(cronie util-linux bind-utils firewalld iproute)
         elif [[ "${release}" == "alpine" ]]; then
-            deps+=(util-linux bind-tools coreutils iproute2)
+            deps+=(util-linux bind-tools coreutils iproute2 procps)
         fi
         
         ${installType} "${deps[@]}" >/dev/null 2>&1
@@ -233,12 +233,12 @@ fetch_github_release() {
         download_url=$(curl -sL "https://ghp.ci/$api_url" | jq -r ".assets[] | select(.name | contains(\"$keyword\")) | .browser_download_url" | head -n 1)
     fi
 
-    # API fallback to raw core files hosted on personal repo
+    # 深度容错：如果官方 API 拦截导致无法获取链接，精确匹配 $repo 强制降级到您的 core 仓库拉取
     if [[ -z "$download_url" || "$download_url" == "null" ]]; then
         echo -e "${YELLOW} -> API 探测失败，自动降级至本地备用仓库拉取... / API failed, fallback to local core repo...${NC}"
         local fallback_url=""
-        case "$keyword" in
-            *"Xray"*) fallback_url="https://raw.githubusercontent.com/alariclin/aio-box/main/core/Xray-linux-${XRAY_ARCH}.zip" ;;
+        case "$repo" in
+            *"Xray-core"*) fallback_url="https://raw.githubusercontent.com/alariclin/aio-box/main/core/Xray-linux-${XRAY_ARCH}.zip" ;;
             *"sing-box"*) fallback_url="https://raw.githubusercontent.com/alariclin/aio-box/main/core/sing-box-linux-${SB_ARCH}.tar.gz" ;;
             *"hysteria"*) fallback_url="https://raw.githubusercontent.com/alariclin/aio-box/main/core/hysteria-linux-${HY2_ARCH}" ;;
         esac
@@ -261,11 +261,11 @@ fetch_github_release() {
         fi
     done
     
-    # Final fallback if official download URLs fail
+    # 深度容错：如果官方链接解析成功，但下载被网络阻断，同样精准匹配 $repo 降级至本地 core 仓库
     echo -e "${YELLOW} -> 官方下载链接失效，自动降级至本地备用仓库拉取... / Official URLs failed, fallback to local core repo...${NC}"
     local fallback_url=""
-    case "$keyword" in
-        *"Xray"*) fallback_url="https://raw.githubusercontent.com/alariclin/aio-box/main/core/Xray-linux-${XRAY_ARCH}.zip" ;;
+    case "$repo" in
+        *"Xray-core"*) fallback_url="https://raw.githubusercontent.com/alariclin/aio-box/main/core/Xray-linux-${XRAY_ARCH}.zip" ;;
         *"sing-box"*) fallback_url="https://raw.githubusercontent.com/alariclin/aio-box/main/core/sing-box-linux-${SB_ARCH}.tar.gz" ;;
         *"hysteria"*) fallback_url="https://raw.githubusercontent.com/alariclin/aio-box/main/core/hysteria-linux-${HY2_ARCH}" ;;
     esac
@@ -552,11 +552,17 @@ deploy_singbox() {
     init_system_environment; pre_install_setup "singbox" "$MODE"; release_ports; get_architecture
     
     # 精准解压与二进制提取，避免通配符溢出风险
-    rm -rf /tmp/sing-box-* /tmp/singbox_core.tar.gz 2>/dev/null
+    rm -rf /tmp/sing-box-* /tmp/singbox_core.tar.gz /tmp/sing-box 2>/dev/null
     
     fetch_github_release "SagerNet/sing-box" "linux-${SB_ARCH}.tar.gz" "singbox_core.tar.gz"
     tar -xzf "/tmp/singbox_core.tar.gz" -C /tmp || { echo -e "${RED}[!] 异常: 压缩包损坏或解压失败！${NC}"; exit 1; }
-    find /tmp/sing-box-* -maxdepth 1 -type f -name "sing-box" -exec mv {} /usr/local/bin/sing-box \; -quit
+    
+    # 深度容错：无论用户在备用仓库中上传的压缩包是否包含多级目录，均能精准锁定二进制程序
+    if [[ -f /tmp/sing-box ]]; then
+        mv /tmp/sing-box /usr/local/bin/sing-box
+    else
+        find /tmp/sing-box-* -maxdepth 1 -type f -name "sing-box" -exec mv {} /usr/local/bin/sing-box \; -quit 2>/dev/null
+    fi
     chmod +x /usr/local/bin/sing-box
 
     KEYPAIR=$(/usr/local/bin/sing-box generate reality-keypair)
