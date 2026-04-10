@@ -175,7 +175,7 @@ sb
 ```
 ---
 ### 📋Panel Menu Overview：
-* **1-10: Core Architecture Orchestration - Mirror-level deployment options for Xray-core (1-5) and Sing-box (6-10).
+* 1-10: Core Architecture Orchestration - Mirror-level deployment options for Xray-core (1-5) and Sing-box (6-10).
 
 * 11: System Benchmark & IP Audit - Invokes bench.sh and Check.Place for deep quality scoring.
 
@@ -194,9 +194,8 @@ sb
 ---
 <a name="-frequently-asked-questions-faq"></a>
 ### ❓Frequently Asked Questions (FAQ)
-* Q: Why does the VLESS node disconnect immediately after connecting?
-
-* A: The VLESS deployment strictly enforces xtls-rprx-vision flow control. In your client (e.g., Shadowrocket, v2rayN), you must not enable Mux (multiplexing), or the packets will be dropped by the Vision filter. Additionally, ensure the camouflage fingerprint (uTLS/Fingerprint) is strictly set to chrome。
+* **Q: Why does the VLESS node disconnect immediately after connecting?
+ * **A:** The VLESS deployment strictly enforces xtls-rprx-vision flow control. In your client (e.g., Shadowrocket, v2rayN), you must not enable Mux (multiplexing), or the packets will be dropped by the Vision filter. Additionally, ensure the camouflage fingerprint (uTLS/Fingerprint) is strictly set to chrome。
 
 * Q: Why does kernel optimization fail on Alpine systems?
 
