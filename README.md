@@ -23,7 +23,7 @@
 2. [🏗️ 架构对比](#-arch-cn)
 3. [🚀 快速部署](#-deploy-cn)
 4. [🛠️ 运维与管理](#-ops-cn)
-5. [❓ 常见问题 (FAQ)](#-faq-cn)
+5. [❓ 常见问题](#-faq-cn)
 
 <a name="-features-cn"></a>
 ### ✨ 核心特性
@@ -112,7 +112,7 @@ sb
 2. [🏗️ Architecture Comparison](#-architecture-comparison)
 3. [🚀 Quick Start](#-quick-start)
 4. [🛠️ Management & Operations](#-management--operations)
-5. [❓ Frequently Asked Questions (FAQ)](#-frequently-asked-questions-faq)
+5. [❓ Frequently Asked Questions](#-frequently-asked-questions-faq)
 
 ---
 <a name="-key-features"></a>
