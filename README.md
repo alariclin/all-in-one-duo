@@ -209,13 +209,13 @@ A: Absolutely not. The script uses precise regex anchoring (only deleting rules 
 ---
 
 ## 💻 系统要求 / System Requirements
-*OS: Debian 10+, Ubuntu 20.04+, CentOS 8+, AlmaLinux, Rocky Linux, Alpine Linux (Full Support).
+* **OS**: Debian 10+, Ubuntu 20.04+, CentOS 8+, AlmaLinux, Rocky Linux, Alpine Linux (Full Support).
 *Init System: Systemd or OpenRC is strictly required for daemon persistence.
 *Network: Dual-stack IPv4 / IPv6 resolution fully supported.
 
 ## 🤝 反馈与交流 / Feedback & Support
 If you encounter any issues or have suggestions, please submit them via:
-* [GitHub Issues](https://github.com/alariclin/all-in-one-duo/issues)
+* [GitHub Issues]([https://github.com/alariclin/aio-box/issues])
 
 ## 📄 许可证 / License
 Released under the[MIT License](https://opensource.org/licenses/MIT).Copyright © 2026.
