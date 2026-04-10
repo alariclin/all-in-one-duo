@@ -1185,7 +1185,7 @@ while true; do
     
     source /etc/ddr/.env 2>/dev/null && CUR_MODE="[${CORE}-${MODE}]" || CUR_MODE=""
     
-    clear; echo -e "${BLUE}======================================================================${NC}\n${BOLD}${YELLOW}==============================Aio-box===============================${NC}\n${BLUE}======================================================================${NC}"
+    clear; echo -e "${BLUE}======================================================================${NC}\n${BOLD}${YELLOW} ==============================Aio-box===============================${NC}\n${BLUE}======================================================================${NC}"
     echo -e " 网关/Gateway: ${YELLOW}$GLOBAL_PUBLIC_IP${NC} | 核心/Core: $STATUS_STR $CUR_MODE\n${BLUE}----------------------------------------------------------------------${NC}"
     echo -e " ${YELLOW}[ Xray-core 部署/Deployment ]${NC}    ${YELLOW}[ Sing-box 部署/Deployment ]${NC}"
     echo -e " ${GREEN}1.${NC} VLESS-Reality                 ${GREEN}6.${NC} VLESS-Reality"
