@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ====================================================================
-# Aio-box Ultimate Console
+# Aio-box Ultimate Console [Dual-Core Hybrid | Auto-Fix | Enterprise]
 # ====================================================================
 
 export DEBIAN_FRONTEND=noninteractive
@@ -222,6 +222,51 @@ setup_shortcut() {
     fi
 }
 
+setup_geo_cron() {
+    cat > /etc/ddr/geo_update.sh << 'EOF'
+#!/bin/bash
+# 强制注入绝对环境变量，防止 Cron 无头环境找不到系统指令
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+GEOIP_URL="https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat"
+GEOSITE_URL="https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat"
+
+mkdir -p /tmp/geo_update
+curl -sL -m 60 "$GEOIP_URL" -o /tmp/geo_update/geoip.dat || curl -sL -m 60 "https://ghp.ci/$GEOIP_URL" -o /tmp/geo_update/geoip.dat
+curl -sL -m 60 "$GEOSITE_URL" -o /tmp/geo_update/geosite.dat || curl -sL -m 60 "https://ghp.ci/$GEOSITE_URL" -o /tmp/geo_update/geosite.dat
+
+SIZE_IP=$(wc -c < /tmp/geo_update/geoip.dat 2>/dev/null | tr -d ' ')
+SIZE_SITE=$(wc -c < /tmp/geo_update/geosite.dat 2>/dev/null | tr -d ' ')
+
+if [[ -n "$SIZE_IP" && "$SIZE_IP" -gt 500000 && -n "$SIZE_SITE" && "$SIZE_SITE" -gt 500000 ]]; then
+    if [[ -d "/usr/local/share/xray" ]]; then
+        mv -f /tmp/geo_update/geoip.dat /usr/local/share/xray/geoip.dat
+        mv -f /tmp/geo_update/geosite.dat /usr/local/share/xray/geosite.dat
+        if command -v systemctl >/dev/null 2>&1; then
+            systemctl restart xray 2>/dev/null
+        else
+            rc-service xray restart 2>/dev/null
+        fi
+    fi
+    if [[ -d "/etc/sing-box" ]]; then
+        cp -f /usr/local/share/xray/geoip.dat /etc/sing-box/geoip.dat 2>/dev/null || mv -f /tmp/geo_update/geoip.dat /etc/sing-box/geoip.dat 2>/dev/null
+        cp -f /usr/local/share/xray/geosite.dat /etc/sing-box/geosite.dat 2>/dev/null || mv -f /tmp/geo_update/geosite.dat /etc/sing-box/geosite.dat 2>/dev/null
+        if command -v systemctl >/dev/null 2>&1; then
+            systemctl restart sing-box 2>/dev/null
+        else
+            rc-service sing-box restart 2>/dev/null
+        fi
+    fi
+fi
+rm -rf /tmp/geo_update
+EOF
+    chmod +x /etc/ddr/geo_update.sh
+    
+    crontab -l | grep -v '/etc/ddr/geo_update.sh' > /tmp/cronjob 2>/dev/null || true
+    echo "0 3 * * 1 /bin/bash /etc/ddr/geo_update.sh >/dev/null 2>&1" >> /tmp/cronjob
+    crontab /tmp/cronjob 2>/dev/null
+    rm -f /tmp/cronjob
+}
+
 # --- [4] 远程资产智能抓取引擎 / GitHub Asset Fetcher ---
 fetch_github_release() {
     local repo=$1; local keyword=$2; local output_file=$3
@@ -233,11 +278,10 @@ fetch_github_release() {
         download_url=$(curl -sL "https://ghp.ci/$api_url" | jq -r ".assets[] | select(.name | contains(\"$keyword\")) | .browser_download_url" | head -n 1)
     fi
 
-    # 深度容错：如果官方 API 拦截导致无法获取链接，精确匹配 $repo 强制降级到您的 core 仓库拉取
     if [[ -z "$download_url" || "$download_url" == "null" ]]; then
         echo -e "${YELLOW} -> API 探测失败，自动降级至本地备用仓库拉取... / API failed, fallback to local core repo...${NC}"
         local fallback_url=""
-        case "$repo" in
+        case "$keyword" in
             *"Xray"*) fallback_url="https://raw.githubusercontent.com/alariclin/aio-box/main/core/Xray-linux-${XRAY_ARCH}.zip" ;;
             *"sing-box"*) fallback_url="https://raw.githubusercontent.com/alariclin/aio-box/main/core/sing-box-linux-${SB_ARCH}.tar.gz" ;;
             *"hysteria"*) fallback_url="https://raw.githubusercontent.com/alariclin/aio-box/main/core/hysteria-linux-${HY2_ARCH}" ;;
@@ -261,10 +305,9 @@ fetch_github_release() {
         fi
     done
     
-    # 深度容错：如果官方链接解析成功，但下载被网络阻断，同样精准匹配 $repo 降级至本地 core 仓库
     echo -e "${YELLOW} -> 官方下载链接失效，自动降级至本地备用仓库拉取... / Official URLs failed, fallback to local core repo...${NC}"
     local fallback_url=""
-    case "$repo" in
+    case "$keyword" in
         *"Xray"*) fallback_url="https://raw.githubusercontent.com/alariclin/aio-box/main/core/Xray-linux-${XRAY_ARCH}.zip" ;;
         *"sing-box"*) fallback_url="https://raw.githubusercontent.com/alariclin/aio-box/main/core/sing-box-linux-${SB_ARCH}.tar.gz" ;;
         *"hysteria"*) fallback_url="https://raw.githubusercontent.com/alariclin/aio-box/main/core/hysteria-linux-${HY2_ARCH}" ;;
@@ -427,6 +470,8 @@ SVC_EOF
     service_manager start hysteria
     sleep 2; is_service_running hysteria || { echo -e "${RED}[!] 致命错误：原生 Hysteria 2 守护进程拉起失败！ / Core panic!${NC}"; exit 1; }
 
+    setup_geo_cron
+
     if [[ "$IS_SILENT" != "SILENT" ]]; then
         cat > /etc/ddr/.env << ENV_EOF
 CORE="hysteria"; MODE="HY2"; UUID=""; VLESS_SNI=""; VLESS_PORT=""; HY2_SNI="$HY2_SNI"; HY2_PORT="$HY2_PORT"; SS_PORT=""; PUBLIC_KEY=""; SHORT_ID=""; HY2_PASS="$HY2_PASS"; HY2_OBFS="$HY2_OBFS"; SS_PASS=""; LINK_IP="${GLOBAL_PUBLIC_IP}"
@@ -442,8 +487,8 @@ deploy_xray() {
     
     rm -rf /tmp/xray_ext /tmp/xray_core.zip 2>/dev/null
     fetch_github_release "XTLS/Xray-core" "Xray-linux-${XRAY_ARCH}.zip" "xray_core.zip"
-    fetch_geo_data "geoip.dat" "https://github.com/v2fly/geoip/releases/latest/download/geoip.dat"
-    fetch_geo_data "geosite.dat" "https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat"
+    fetch_geo_data "geoip.dat" "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat"
+    fetch_geo_data "geosite.dat" "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat"
     
     unzip -qo "/tmp/xray_core.zip" -d /tmp/xray_ext || { echo -e "${RED}[!] 异常: 压缩包损坏或解压失败！${NC}"; exit 1; }
     mv /tmp/xray_ext/xray /usr/local/bin/xray; chmod +x /usr/local/bin/xray
@@ -535,6 +580,8 @@ SVC_EOF
 
     service_manager start xray
     sleep 2; is_service_running xray || { echo -e "${RED}[!] 致命错误：Xray 守护进程拉起失败！ / Core panic!${NC}"; exit 1; }
+
+    setup_geo_cron
 
     if [[ "$MODE" == "ALL" ]]; then
         deploy_official_hy2 "SILENT"
@@ -679,6 +726,8 @@ SVC_EOF
     service_manager start sing-box
     sleep 2; is_service_running sing-box || { echo -e "${RED}[!] 致命错误：Sing-box 守护进程拉起失败！ / Core panic!${NC}"; exit 1; }
 
+    setup_geo_cron
+
     cat > /etc/ddr/.env << ENV_EOF
 CORE="singbox"; MODE="$MODE"; UUID="$UUID"; VLESS_SNI="$VLESS_SNI"; VLESS_PORT="$VLESS_PORT"; HY2_SNI="$HY2_SNI"; HY2_PORT="$HY2_PORT"; SS_PORT="$SS_PORT"; PUBLIC_KEY="$PBK"; SHORT_ID="$SHORT_ID"; HY2_PASS="$HY2_PASS"; HY2_OBFS="$HY2_OBFS"; SS_PASS="$SS_PASS"; LINK_IP="${GLOBAL_PUBLIC_IP}"
 ENV_EOF
@@ -689,6 +738,8 @@ ENV_EOF
 setup_traffic_monitor() {
     cat > /etc/ddr/traffic_monitor.sh << 'EOF'
 #!/bin/bash
+# 强制注入绝对环境变量，防止 Cron 无头环境找不到系统指令
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 source /etc/ddr/.env
 if [[ -z "$TRAFFIC_LIMIT_GB" ]]; then
     exit 0
@@ -731,7 +782,7 @@ fi
 EOF
     chmod +x /etc/ddr/traffic_monitor.sh
     crontab -l | grep -v '/etc/ddr/traffic_monitor.sh' > /tmp/cronjob 2>/dev/null || true
-    echo "*/5 * * * * /bin/bash /etc/ddr/traffic_monitor.sh >/dev/null 2>&1" >> /tmp/cronjob
+    echo "* * * * * /bin/bash /etc/ddr/traffic_monitor.sh >/dev/null 2>&1" >> /tmp/cronjob
     crontab /tmp/cronjob
     rm -f /tmp/cronjob
 }
@@ -769,7 +820,7 @@ traffic_management_menu() {
     source /etc/ddr/.env 2>/dev/null
     if [[ -n "$TRAFFIC_LIMIT_GB" ]]; then
         echo -e "当前设定的每月流量上限: ${GREEN}${TRAFFIC_LIMIT_GB} GB${NC}"
-        echo -e "管控状态: ${GREEN}监控中 (每 5 分钟自动检测一次)${NC}"
+        echo -e "管控状态: ${GREEN}监控中 (每分钟自动检测一次)${NC}"
     else
         echo -e "当前设定的每月流量上限: ${RED}未开启 (Unlimited)${NC}"
     fi
@@ -894,58 +945,31 @@ EOF
 }
 
 show_usage() {
-    clear
+    clear; echo -e "${CYAN}======================================================================${NC}"
+    echo -e "${BOLD}${GREEN}   Aio-box 脚本说明书 / Script Manual${NC}"
     echo -e "${CYAN}======================================================================${NC}"
-    echo -e "${BOLD}${GREEN}     Aio-box 脚本全功能说明书 / Full Functional Manual${NC}"
-    echo -e "${CYAN}======================================================================${NC}"
+    
+    echo -e "${YELLOW}【一】编排逻辑与架构选择 / Architectural Guide${NC}"
+    echo -e "   - [模式 10] Sing-box: 聚合平台架构。以超低内存占用实现三引擎完美共享。"
+    echo -e "     (Sing-box: Aggregation Platform Architecture. Achieving seamless sharing of three engines with ultra-low memory usage..)"
+    echo -e "   - [模式 5] Xray-core (Hybrid): 物理隔离架构。TCP由Xray原生承载，UDP由官方Hysteria 2承载。"
+    echo -e "     (Xray-core (Hybrid): Physical isolation architecture. TCP is carried by Xray itself, while UDP is carried by the official Hysteria 2..)\n"
 
-    echo -e "${YELLOW}【一】核心部署模式 / Core Deployment Modes${NC}"
-    echo -e " 1.  Xray VLESS-Reality: 采用主流 Xray 核心，提供最稳健的 Reality 伪装支持。"
-    echo -e "     (Uses Xray-core for the most robust Reality camouflage support.)"
-    echo -e " 2.  Xray Shadowsocks-2022: 部署最新标准 SS 协议，兼顾高强度加密与传输性能。"
-    echo -e "     (Deploys the latest SS standard, balancing high encryption and performance.)"
-    echo -e " 3.  Xray VLESS + SS-2022: 混合部署模式，单端口实现多协议兼容。"
-    echo -e "     (Hybrid deployment mode, achieving multi-protocol compatibility on a single port.)"
-    echo -e " 4.  Hysteria 2 (Native): 采用 Apernet 官方原版核心，专注暴力拥塞控制与 UDP 穿透。"
-    echo -e "     (Uses official Apernet core, focusing on aggressive congestion control and UDP piercing.)"
-    echo -e " 5.  Xray + Hy2 (Hybrid): 物理隔离架构。TCP 由 Xray 承载，UDP 由 Hy2 原生承载，稳定性极高。"
-    echo -e "     (Physical isolation architecture: TCP by Xray, UDP by native Hy2, offering extreme stability.)"
-    echo -e " 6.  Sing-box VLESS-Reality: 利用 Sing-box 高效能架构部署 VLESS，内存占用极低。"
-    echo -e "     (Uses Sing-box high-performance architecture for VLESS with ultra-low memory usage.)"
-    echo -e " 7.  Sing-box Shadowsocks-2022: Sing-box 原生承载 SS 协议，适合轻量化运维。"
-    echo -e "     (Sing-box natively carries the SS protocol, ideal for lightweight maintenance.)"
-    echo -e " 8.  Sing-box VLESS + SS-2022: Sing-box 环境下的双协议聚合部署。"
-    echo -e "     (Dual-protocol aggregated deployment within the Sing-box environment.)"
-    echo -e " 9.  Sing-box Hysteria 2: Sing-box 聚合版 Hy2，实现单一进程管理 UDP 加密流量。"
-    echo -e "     (Sing-box aggregated Hy2, managing encrypted UDP traffic within a single process.)"
-    echo -e " 10. Sing-box ALL: 全协议聚合。一键在 Sing-box 内部启动 VLESS、SS 与 Hy2。"
-    echo -e "     (Full protocol aggregation. Starts VLESS, SS, and Hy2 within Sing-box in one go.)\n"
+    echo -e "${YELLOW}【二】终端对齐规范 / Constraint Violations${NC}"
+    echo -e "   1. 关于 VLESS-Reality 的物理特征对齐 / About VLESS-Reality physical alignment:"
+    echo -e "      - 禁区：客户端绝不能开启 Mux(多路复用)！否则将被 Vision 流控直接断连。"
+    echo -e "        (Taboo: NEVER enable Mux in client configs, or Vision flow control will drop it.)"
+    echo -e "      - 要求：伪装指纹 (uTLS) 需高度保真，强烈推荐 chrome 选项。"
+    echo -e "        (Requirement: uTLS fingerprint must be highly authentic, 'chrome' is highly recommended.)"
+    echo -e "   2. 关于 Hysteria 2 的证书免疫逃透 / About Hysteria 2 certificate immunity:"
+    echo -e "      - 客户端侧验证必须选择不安全（Insecure / Skip Cert Verify）。"
+    echo -e "        (Client side MUST enable 'Insecure' or 'Skip Cert Verify' due to self-signed certs.)\n"
 
-    echo -e "${YELLOW}【二】终端对齐与强制规范 / Terminal Alignment & Enforcement${NC}"
-    echo -e " 1. VLESS-Reality 禁区 (Reality Taboo):"
-    echo -e "    - 严禁开启 Mux (多路复用)：Vision 流控要求原始包长度对齐，开启 Mux 会导致特征识别失败被断连。"
-    echo -e "      (NEVER enable Mux: Vision flow control requires original packet length alignment; Mux will cause disconnection.)"
-    echo -e "    - 伪装指纹 (uTLS)：必须使用 'chrome' 指纹以模拟真实流量特征。"
-    echo -e "      (uTLS Fingerprint: MUST use 'chrome' to simulate authentic traffic characteristics.)"
-    echo -e " 2. Hysteria 2 免疫策略 (Hy2 Immunity):"
-    echo -e "    - 证书验证：由于采用自签证书，客户端必须开启 '允许不安全证书' 或 '跳过证书验证'。"
-    echo -e "      (Certificate: Due to self-signed certs, clients MUST enable 'Allow Insecure' or 'Skip Cert Verify'.)\n"
-
-    echo -e "${YELLOW}【三】面板运维核武功能 / Panel Operations & Artillery Tools${NC}"
-    echo -e " 11. 测速与 IP 审计 (Benchmark): 调用 bench.sh 与 Check.Place 检测 VPS 性能与 IP 欺诈分。"
-    echo -e "     (Runs bench.sh and Check.Place to audit VPS performance and IP fraud scores.)"
-    echo -e " 12. VPS 一键优化 (BBR Tuning): 注入内核参数，开启 BBR 算法，优化句柄上限至 104 万。"
-    echo -e "     (Injects kernel params, enables BBR, and boosts file descriptor limits to 1.04M.)"
-    echo -e " 13. 参数显示 (View Config): 实时生成 URI 分享链接、二维码及 Clash Meta 配置文件片段。"
-    echo -e "     (Generates URI links, QR codes, and Clash Meta configuration snippets in real-time.)"
-    echo -e " 15. OTA 升级 (Script Update): 绕过缓存同步 GitHub 远端源码，实现脚本无损热更新。"
-    echo -e "     (Syncs remote GitHub source bypassing cache for lossless script hot-updates.)"
-    echo -e " 16. 一键清空 (Uninstall): 提供物理级完全清场模式，彻底粉碎节点、配置与防火墙规则。"
-    echo -e "     (Provides a physical-level wipe mode to completely shred nodes, configs, and firewall rules.)"
-    echo -e " 17. 环境自愈 (Self-Healing): 自动扫描进程死锁、清除脏路由、释放端口占用，恢复系统纯净。"
-    echo -e "     (Auto-scans process deadlocks, clears dirty routes, and releases ports to restore system purity.)"
-    echo -e " 18. 流量管控 (Traffic Limit): 基于 vnstat 监控流量，支持到达月度阈值后自动熔断服务以防超支。"
-    echo -e "     (Monitors traffic via vnstat; supports auto-shutdown after reaching monthly thresholds to prevent overage.)"
+    echo -e "${YELLOW}【三】面板内置核武功能 / Panel Artillery Tools${NC}"
+    echo -e "   - [菜单 12] VPS一键优化 / VPS Tuning: 调用 sysctl 注入底层加速参数与 BBR 算法。"
+    echo -e "   - [菜单 17] 安装环境初始化 / Environment Auto-Fix: 自我诊断，阻断死锁与脏路由。"
+    echo -e "     (Auto-Fix: White-box self-diagnosis to resolve port deadlocks and clear dirty routing rules.)\n"
+    
     echo -e "${CYAN}======================================================================${NC}"
     read -ep " 阅读完毕，按回车返回主菜单 / Press Enter to return to main menu..."
 }
@@ -973,13 +997,43 @@ update_script() {
     read -ep "按回车返回总台 / Press Enter to return..."
 }
 
+force_update_geo() {
+    clear
+    echo -e "${CYAN}======================================================================${NC}"
+    echo -e "${BOLD}${GREEN}   Loyalsoldier Geo 资源强更 / Force Update Geo Data${NC}"
+    echo -e "${CYAN}======================================================================${NC}"
+    echo -e "${YELLOW}[*] 正在拉取 Loyalsoldier 增强版 Geo 资源并执行校验... / Fetching Geo Data...${NC}"
+    setup_geo_cron
+    bash /etc/ddr/geo_update.sh
+    echo -e "${GREEN}✔ Geo 资源更新与校验成功，已覆盖核心文件并完成热重载！${NC}"
+    echo -e "${GREEN}✔ 定时任务已同步下发：每周一夜里 3:00 自动静默执行闭环更新。${NC}"
+    read -ep "按回车返回..."
+}
+
+ota_and_geo_menu() {
+    clear
+    echo -e "${CYAN}======================================================================${NC}"
+    echo -e "${BOLD}${GREEN}   脚本 OTA 升级与 Geo 资源更新 / OTA & Geo Update${NC}"
+    echo -e "${CYAN}======================================================================${NC}"
+    echo -e "${YELLOW}1. 升级 Aio-box 核心脚本 (OTA Update Script)${NC}"
+    echo -e "${YELLOW}2. 立即拉取并更新 Loyalsoldier Geo 资源 (Update Geo Data & Set Cron)${NC}"
+    echo -e "${GREEN}0. 返回主菜单 / Return${NC}"
+    echo -e "${CYAN}======================================================================${NC}"
+    read -ep " 请选择 / Select [0-2]: " ota_choice
+    case $ota_choice in
+        1) update_script ;;
+        2) force_update_geo ;;
+        *) return 0 ;;
+    esac
+}
+
 clean_uninstall_menu() {
     clear
     echo -e "${CYAN}======================================================================${NC}"
     echo -e "${BOLD}${RED}   深度卸载系统 / Deep Unloading System${NC}"
     echo -e "${CYAN}======================================================================${NC}"
-    echo -e "${YELLOW}1. 完全卸载/Complete uninstallation (销毁节点、配置表、防火墙映射与脚本)${NC}"
-    echo -e "${YELLOW}2. 保留脚本与卸载/Keep the script and uninstall (销毁节点配置等，但保留脚本)${NC}"
+    echo -e "${YELLOW}1. 完全物理清场/Complete physical decontamination (销毁节点、配置表、防火墙映射与全局快速访问别名)${NC}"
+    echo -e "${YELLOW}2. 保留脚本与清场/Maintain the script and clear the area (销毁节点配置等，但留存控制台与环境供随时重构)${NC}"
     echo -e "${GREEN}0. 取消并返回 / Abort and Return${NC}"
     echo -e "${CYAN}======================================================================${NC}"
     read -ep " 请谨慎输入执行代码 / Execution Code [0-2]: " un_choice
@@ -1006,11 +1060,11 @@ do_cleanup() {
     rm -f /etc/init.d/xray /etc/init.d/sing-box /etc/init.d/hysteria
     rm -f /etc/sysctl.d/99-aio-box-tune.conf /etc/security/limits.d/aio-box.conf
     
-    # 清理流量监控脚本和定时任务
-    crontab -l | grep -v '/etc/ddr/traffic_monitor.sh' > /tmp/cronjob 2>/dev/null || true
+    # 清理流量监控和 Geo 更新脚本与定时任务
+    crontab -l | grep -vE '/etc/ddr/traffic_monitor.sh|/etc/ddr/geo_update.sh' > /tmp/cronjob 2>/dev/null || true
     crontab /tmp/cronjob 2>/dev/null
     rm -f /tmp/cronjob
-    rm -f /etc/ddr/traffic_monitor.sh
+    rm -f /etc/ddr/traffic_monitor.sh /etc/ddr/geo_update.sh
     
     [[ "$INIT_SYS" == "systemd" ]] && systemctl daemon-reload 2>/dev/null || true
     
@@ -1029,7 +1083,7 @@ check_virgin_state() {
     clear
     init_system_environment
     echo -e "\n\033[1;33m================================================================\033[0m"
-    echo -e "\033[1;33m 删除全部节点与环境初始化 / Delete all nodes and perform environment initialization    \033[0m"
+    echo -e "\033[1;33m       Aio-box 异常诊断与环境自愈 (Self-Healing Routine)    \033[0m"
     echo -e "\033[1;33m================================================================\033[0m\n"
 
     echo -e "\033[1;36m[1/5] 执行内存地址与高优端口锁死检测 / Scanning memory address binding...\033[0m"
@@ -1198,7 +1252,7 @@ while true; do
     echo -e " ${GREEN}12.${NC} VPS一键优化（bbr） / One-click VPS Optimization (BBR)"
     echo -e " ${GREEN}13.${NC} 全部节点参数显示 / Display of all node parameters"
     echo -e " ${GREEN}14.${NC} 脚本说明书 / Script Description Document"
-    echo -e " ${GREEN}15.${NC} 脚本OTA升级 / Script OTA upgrade"
+    echo -e " ${GREEN}15.${NC} 脚本OTA升级与Geo资源更新 / Script OTA & Geo Resource Update"
     echo -e " ${GREEN}16.${NC} 一键全部清空卸载 / One-click to completely clear and uninstall"
     echo -e " ${GREEN}17.${NC} 删除全部节点与环境初始化 / Delete all nodes and perform environment initialization"
     echo -e " ${GREEN}18.${NC} 每月流量管控限制 / Monthly Traffic Management Limit"
@@ -1221,7 +1275,7 @@ while true; do
         12) tune_vps ;; 
         13) view_config ;; 
         14) show_usage ;;
-        15) update_script ;;
+        15) ota_and_geo_menu ;;
         16) clean_uninstall_menu ;; 
         17) check_virgin_state ;; 
         18) traffic_management_menu ;;
