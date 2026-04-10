@@ -184,7 +184,7 @@ sb
 16: One-Click Uninstall - Executes defensive uninstallation, physically destroying all remnants and rolling back the system。
 17: Environment Initialization (Auto-Fix) - Scans for port deadlocks, clears dirty routes, and tests connectivity。
 ---
-<a name="-management--operations"></a>
+<a name="-frequently-asked-questions-faq"></a>
 ### ❓Frequently Asked Questions (FAQ)
 Q: Why does the VLESS node disconnect immediately after connecting?
 A: The VLESS deployment strictly enforces xtls-rprx-vision flow control. In your client (e.g., Shadowrocket, v2rayN), you must not enable Mux (multiplexing), or the packets will be dropped by the Vision filter. Additionally, ensure the camouflage fingerprint (uTLS/Fingerprint) is strictly set to chrome。
