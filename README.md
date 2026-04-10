@@ -73,13 +73,14 @@ sb
 ---
 ### 📋面板菜单速览：
 * 1-10: 核心架构编排 - 分别对应 Xray (1-5) 与 Sing-box (6-10) 的部署组合。
-* 11: 系统 Benchmark & IP 审计 - 启动 bench.sh 与 Check.Place 跑分。
+* 11: 测速与 IP 审计 - 调用 bench.sh 与 Check.Place 检测 VPS 性能与 IP 欺诈分。
 * 12: VPS 一键优化 - 物理注入 BBR 算法并提升内核并发句柄。
 * 13: 节点参数显示 - 以明文及 Clash Meta YAML 格式输出当前拓扑配置。
-* 14: 脚本说明书 - 查阅针对 VLESS-Vision 指纹对齐及 Hy2 证书避坑指南。
-* 15: 脚本 OTA 升级 - 热加载 GitHub 最新发行版源码。
-* 16: 一键清空卸载 - 执行防御式卸载，物理销毁残留碎片。
-* 17: 环境自愈 (Auto-Fix) - 扫描死锁、清理脏路由、连通性探测。
+* 14: 脚本说明书 - 所有功能详细解释避坑指南。
+* 15: 脚本 OTA 升级 - 绕过缓存同步 GitHub 远端源码，实现脚本无损热更新。
+* 16: 一键清空 - 提供物理级完全清场模式，彻底粉碎节点、配置与防火墙规则。
+* 17: 环境自愈 - 扫描死锁、清理脏路由、连通性探测。
+* 18: 流量管控 - 基于 vnstat 监控流量，支持到达月度阈值后自动熔断服务以防超支。
 ---
 
 <a name="-faq-cn"></a>
@@ -154,14 +155,15 @@ sb
 ```
 ---
 ### 📋 Panel Menu Overview:
-* **1-10**: Core Architecture Orchestration - Mirror-level deployment options for Xray-core (1-5) and Sing-box (6-10).
-* **11**: System Benchmark & IP Audit - Invokes bench.sh and Check.Place for deep quality scoring.
-* **12**: VPS One-Click Tuning - Injects BBR and elevates kernel handles to million-level concurrency.
-* **13**: Node Parameter Display - Exports current topology in Plaintext, URI Links, and Clash Meta YAML formats.
-* **14**: User Manual - Detailed guidance on VLESS-Vision fingerprint alignment and Hy2 certificate immunity.
-* **15**: Script OTA Update - Bypasses local cache to hot-load the latest source code from GitHub Master branch.
-* **16**: One-Click Uninstall - Executes defensive uninstallation, physically destroying all remnants and rolling back the system.
-* **17**: Environment Initialization (Auto-Fix) - Scans for port deadlocks, clears dirty routes, and tests connectivity.
+* **1-10**: Core Architecture Arrangement - Corresponding to the deployment combinations of Xray (1-5) and Sing-box (6-10).
+* **11**: Speed Measurement and IP Audit - Calling bench.sh and Check.Place to detect VPS performance and IP fraud scores.
+* **12**: One-click VPS Optimization - Physically inject BBR algorithm and enhance kernel concurrent handles.
+* **13**: Node Parameter Display - Outputs current topology configuration in plain text and Clash Meta YAML format.
+* **14**: Script Manual - Detailed explanations of all functions and a guide to avoid pitfalls.
+* **15**: Script OTA Upgrade - Overcomes cache synchronization and synchronizes remote source code from GitHub to achieve lossless hot update of the script.
+* **16**:  One-click Clearing - Provides a physical-level complete clearance mode to completely destroy nodes, configurations, and firewall rules.
+* **17**: Environment Self-healing - Scans for deadlocks, cleans up dirty routes, and conducts connectivity detection.
+* **18**: Traffic Control - Monitors traffic based on vnstat and supports automatic service disconnection upon reaching monthly thresholds to prevent over-consumption.
 
 ---
 <a name="-frequently-asked-questions-faq"></a>
