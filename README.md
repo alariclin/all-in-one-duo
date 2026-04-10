@@ -69,7 +69,7 @@ sudo bash -c "$(curl -Ls https://ghp.ci/https://raw.githubusercontent.com/alaric
 sb
 ```
 
-### 面板菜单速览：
+### 🛠️面板菜单速览：
 1-10: 核心架构编排 - 分别对应 Xray (1-5) 与 Sing-box (6-10) 的部署组合。
 
 11: 系统 Benchmark & IP 审计 - 启动 bench.sh 与 Check.Place 跑分。
