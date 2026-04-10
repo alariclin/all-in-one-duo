@@ -981,11 +981,11 @@ while true; do
     
     source /etc/ddr/.env 2>/dev/null && CUR_MODE="[${CORE}-${MODE}]" || CUR_MODE=""
     
-    clear; echo -e "${BLUE}======================================================================${NC}\n${BOLD}${YELLOW}==============================Aio-box================================${NC}\n${BLUE}======================================================================${NC}"
+    clear; echo -e "${BLUE}======================================================================${NC}\n${BOLD}${YELLOW}===============================Aio-box================================${NC}\n${BLUE}======================================================================${NC}"
     echo -e " 连通网关: ${YELLOW}$GLOBAL_PUBLIC_IP${NC} | 物理运行栈: $STATUS_STR $CUR_MODE\n${BLUE}----------------------------------------------------------------------${NC}"
     echo -e " ${YELLOW}[ Xray-core 部署 ]${NC}                ${YELLOW}[ Sing-box 部署 ]${NC}"
-    echo -e " ${GREEN}1.${NC} VLESS-Vision (Reality)          ${GREEN}6.${NC} VLESS-Vision (Reality)"
-    echo -e " ${GREEN}2.${NC} Shadowsocks-2022                ${GREEN}7.${NC} Shadowsocks-2022"
+    echo -e " ${GREEN}1.${NC} VLESS-Vision (Reality)         ${GREEN}6.${NC} VLESS-Vision (Reality)"
+    echo -e " ${GREEN}2.${NC} Shadowsocks-2022               ${GREEN}7.${NC} Shadowsocks-2022"
     echo -e " ${GREEN}3.${NC} VLESS + SS-2022 组合           ${GREEN}8.${NC} VLESS + SS-2022 组合"
     echo -e " ${GREEN}4.${NC} Hysteria 2 (Apernet 原生核心)  ${GREEN}9.${NC} Hysteria 2 (聚合版)"
     echo -e " ${GREEN}5.${NC} 协议全家桶 (混编:Xray+原生Hy2) ${GREEN}10.${NC} 协议全家桶 (纯净:Sing-box)"
