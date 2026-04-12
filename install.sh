@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # ==============================Aio-box===============================
-
 export DEBIAN_FRONTEND=noninteractive
 export LANG=en_US.UTF-8
 RED='\033[0;31m' GREEN='\033[0;32m' YELLOW='\033[0;33m' BLUE='\033[0;36m' PURPLE='\033[0;35m' CYAN='\033[0;36m' NC='\033[0m' BOLD='\033[1m'  
@@ -508,13 +507,15 @@ deploy_xray() {
     
     UUID=$(generate_robust_uuid); SHORT_ID=$(openssl rand -hex 4 | tr -d '\n\r'); SS_PASS=$(openssl rand -base64 16 | tr -d '\n\r')
 
+    # [优化] 自动注入 TCP Keep-Alive 保活参数 (30s)
     JSON_VLESS=$(cat << EOF
     {
       "listen": "::", "port": ${VLESS_PORT}, "protocol": "vless",
       "settings": { "clients": [{"id": "${UUID}", "flow": "xtls-rprx-vision"}], "decryption": "none" },
       "streamSettings": {
         "network": "tcp", "security": "reality",
-        "realitySettings": { "dest": "${VLESS_SNI}:443", "serverNames": ["${VLESS_SNI}"], "privateKey": "${PK}", "shortIds": ["${SHORT_ID}"] }
+        "realitySettings": { "dest": "${VLESS_SNI}:443", "serverNames": ["${VLESS_SNI}"], "privateKey": "${PK}", "shortIds": ["${SHORT_ID}"] },
+        "sockopt": { "tcpKeepAliveIdle": 30, "tcpKeepAliveInterval": 30 }
       },
       "sniffing": { "enabled": true, "destOverride": ["http", "tls", "quic"] }
     }
@@ -523,7 +524,10 @@ EOF
     JSON_SS=$(cat << EOF
     {
       "listen": "::", "port": ${SS_PORT}, "protocol": "shadowsocks",
-      "settings": { "method": "2022-blake3-aes-128-gcm", "password": "${SS_PASS}", "network": "tcp,udp" }
+      "settings": { "method": "2022-blake3-aes-128-gcm", "password": "${SS_PASS}", "network": "tcp,udp" },
+      "streamSettings": {
+        "sockopt": { "tcpKeepAliveIdle": 30, "tcpKeepAliveInterval": 30 }
+      }
     }
 EOF
 )
@@ -628,9 +632,11 @@ deploy_singbox() {
     openssl req -new -x509 -days 36500 -key /etc/sing-box/hy2.key -out /etc/sing-box/hy2.crt -subj "/CN=${HY2_SNI}" 2>/dev/null
     chmod 600 /etc/sing-box/hy2.key
 
+    # [优化] 自动注入 TCP Keep-Alive 保活参数 (30s)
     JSON_VLESS=$(cat << EOF
     {
       "type": "vless", "listen": "::", "listen_port": ${VLESS_PORT}, "tcp_fast_open": true,
+      "tcp_keep_alive_idle": "30s", "tcp_keep_alive_interval": "30s",
       "users": [{"uuid": "${UUID}", "flow": "xtls-rprx-vision"}],
       "tls": {
         "enabled": true, "server_name": "${VLESS_SNI}",
@@ -651,6 +657,7 @@ EOF
     JSON_SS=$(cat << EOF
     {
       "type": "shadowsocks", "listen": "::", "listen_port": ${SS_PORT}, "tcp_fast_open": true,
+      "tcp_keep_alive_idle": "30s", "tcp_keep_alive_interval": "30s",
       "method": "2022-blake3-aes-128-gcm", "password": "${SS_PASS}"
     }
 EOF
@@ -1212,7 +1219,7 @@ fs.inotify.max_user_instances = 8192
 net.ipv4.ip_forward = 1
 net.ipv4.tcp_syncookies = 3
 net.ipv4.tcp_fin_timeout = 30
-net.ipv4.tcp_keepalive_time = 1200
+net.ipv4.tcp_keepalive_time = 30
 net.ipv4.tcp_max_syn_backlog = 8192
 net.ipv4.tcp_max_tw_buckets = 5000
 net.ipv4.tcp_fastopen = 3
@@ -1234,6 +1241,27 @@ EOF
             done
         else
             sysctl --system >/dev/null 2>&1 || true
+        fi
+    fi
+
+    # [增强功能] 自动检测现存代理配置，热注入 TCP 心跳保活参数
+    if [[ -f /usr/local/etc/xray/config.json ]] && ! grep -q "tcpKeepAliveIdle" /usr/local/etc/xray/config.json; then
+        echo -e "${YELLOW}[*] 正在向 Xray 配置注入 TCP 双向心跳保活参数 (30s)...${NC}"
+        if command -v jq >/dev/null 2>&1; then
+            jq '(.inbounds[] | select(.protocol=="vless" or .protocol=="shadowsocks")) |= . + {"streamSettings": ((.streamSettings // {}) + {"sockopt": {"tcpKeepAliveIdle": 30, "tcpKeepAliveInterval": 30}})}' /usr/local/etc/xray/config.json > /tmp/xray_patch.json
+            mv -f /tmp/xray_patch.json /usr/local/etc/xray/config.json
+            service_manager start xray 2>/dev/null
+            echo -e "${GREEN}    ✔ Xray 服务端心跳底层注入完成！${NC}"
+        fi
+    fi
+
+    if [[ -f /etc/sing-box/config.json ]] && ! grep -q "tcp_keep_alive_idle" /etc/sing-box/config.json; then
+        echo -e "${YELLOW}[*] 正在向 Sing-box 配置注入 TCP 双向心跳保活参数 (30s)...${NC}"
+        if command -v jq >/dev/null 2>&1; then
+            jq '(.inbounds[] | select(.type=="vless" or .type=="shadowsocks")) += {"tcp_keep_alive_idle": "30s", "tcp_keep_alive_interval": "30s"}' /etc/sing-box/config.json > /tmp/sb_patch.json
+            mv -f /tmp/sb_patch.json /etc/sing-box/config.json
+            service_manager start sing-box 2>/dev/null
+            echo -e "${GREEN}    ✔ Sing-box 服务端心跳底层注入完成！${NC}"
         fi
     fi
     
