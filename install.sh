@@ -1280,7 +1280,7 @@ while true; do
     STATUS_STR=""
     is_service_running xray && STATUS_STR="${GREEN}Xray-Core${NC} "
     is_service_running sing-box && STATUS_STR+="${GREEN}Sing-Box${NC} "
-    is_service_running hysteria && STATUS_STR+="${GREEN}Hy2(Native)${NC} "
+    is_service_running hysteria && STATUS_STR+="${GREEN}Hy2(Apernet)${NC} "
     [[ -z "$STATUS_STR" ]] && STATUS_STR="${RED}Stack Stopped${NC}"
     
     source /etc/ddr/.env 2>/dev/null && CUR_MODE="[${CORE}-${MODE}]" || CUR_MODE=""
