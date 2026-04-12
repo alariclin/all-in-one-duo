@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ====================================================================================================
-# Aio-box Ultimate Console [Dual-Core Hybrid | Auto-Fix | Enterprise V9.9 Final Perfected]
-# [Deep Deterministic Reasoning Audited: Alpine Compatibility, POSIX Safeties, Disk Space Integrity]
+# Aio-box Ultimate Console [Dual-Core Hybrid | Auto-Fix | Enterprise V9.9 Final Perfected (Speed Edition)]
+# [Deep Deterministic Reasoning Audited: Instant Menu Startup, Auto-Healing Shortcut, Zero-Block Init]
 # ====================================================================================================
 
 umask 077
@@ -10,13 +10,13 @@ export LANG=en_US.UTF-8
 export LC_ALL=C
 export PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 
-# [优化] 禁用核心转储，防止敏感内存数据泄露，安全设定企业级高并发句柄数为 1048576 (100万)
+# 禁用核心转储，防止敏感内存数据泄露，安全设定企业级高并发句柄数为 1048576 (100万)
 ulimit -c 0 
 ulimit -n 1048576
 
 RED='\033[0;31m' GREEN='\033[0;32m' YELLOW='\033[0;33m' BLUE='\033[0;36m' PURPLE='\033[0;35m' CYAN='\033[0;36m' NC='\033[0m' BOLD='\033[1m'
 
-trap 'echo -e "\n${RED}[!] 捕捉到中断信号，正在清理环境并解开原子锁...${NC}"; rm -rf /dev/shm/aio_box_* /dev/shm/aio_geo_update 2>/dev/null; rm -f /var/run/aio_box.lock; exit 1' INT TERM
+trap 'echo -e "\n${RED}[!] 捕捉到中断信号，正在清理环境...${NC}"; rm -rf /dev/shm/aio_box_* /dev/shm/aio_geo_update 2>/dev/null; rm -f /var/run/aio_box.lock; exit 1' INT TERM
 
 LOG_FILE="/var/log/aio_box_enterprise.log"
 [[ ! -f "$LOG_FILE" ]] && touch "$LOG_FILE" && chmod 600 "$LOG_FILE"
@@ -25,8 +25,6 @@ if [[ -z "${AIO_LOG_PIPED:-}" ]]; then
     export AIO_LOG_PIPED=1
     exec > >(tee >(sed -r 's/\x1B\[[0-9;]*[a-zA-Z]//g' >> "$LOG_FILE")) 2>&1
 fi
-
-echo -e "${BLUE}[*] $(date '+%Y-%m-%d %H:%M:%S') - Aio-Box 极巅算力引擎启动 (PID: $$)${NC}"
 
 if [[ $EUID -ne 0 ]]; then
     if command -v sudo >/dev/null 2>&1; then
@@ -39,7 +37,7 @@ fi
 
 exec 9<> /var/run/aio_box.lock
 if ! flock -n 9; then
-    echo -e "${RED}[!] 致命异常: 检测到并行实例，互斥锁已激活，禁止覆写内核配置！${NC}"
+    echo -e "${RED}[!] 致命异常: 检测到并行实例，互斥锁已激活！${NC}"
     exit 1
 fi
 
@@ -53,6 +51,9 @@ has_ipv6() {
     fi
 }
 
+# ====================================================================
+# 系统算力深度调优模块 (仅在部署或优化时调用，不阻塞主菜单)
+# ====================================================================
 audit_hardware_resources() {
     echo -e "${CYAN} -> [硬件审计] 探测 CPU、内存拓扑及指令周期...${NC}"
     
@@ -130,7 +131,7 @@ enable_rps_rfs_and_offload() {
             local cpu_count=$(nproc)
             local rps_mask=$(printf "%x" $(( (1 << cpu_count) - 1 )))
             
-            # [完美修复] 移除 for in 声明中的重定向，改在内部做存在性校验
+            # [语法修复] 取消 for 循环声明处的重定向，改为内部执行时安全跳过
             for rps_flow in /sys/class/net/$INTERFACE/queues/rx-*/rps_cpus; do
                 [[ -f "$rps_flow" ]] && echo "$rps_mask" > "$rps_flow" 2>/dev/null || true
             done
@@ -148,10 +149,7 @@ enable_rps_rfs_and_offload() {
 }
 
 calibrate_system_clock() {
-    echo -e "${CYAN} -> [时钟校准] 执行高精度系统时钟强对齐...${NC}"
-    if command -v timedatectl >/dev/null 2>&1; then
-        timedatectl set-ntp true >/dev/null 2>&1 || true
-    fi
+    # [秒进修复] 时钟同步放入后台独立进程池运行，彻底剥离阻塞，绝不卡顿主线程
     (
         if command -v chronyc >/dev/null 2>&1; then
             chronyc makestep >/dev/null 2>&1
@@ -161,11 +159,12 @@ calibrate_system_clock() {
             local HTTP_DATE=$(curl -s --head -m 5 http://google.com | grep ^Date: | sed 's/Date: //g' || true)
             [[ -n "$HTTP_DATE" ]] && date -s "$HTTP_DATE" >/dev/null 2>&1 || true
         fi
-    ) &
-    wait
-    echo -e "${GREEN}    ✔ 时间同步完成。${NC}"
+    ) >/dev/null 2>&1 &
 }
 
+# ====================================================================
+# 基础环境初始化 (秒开版)
+# ====================================================================
 init_system_environment() {
     if [[ -n $(find /etc -name "redhat-release" 2>/dev/null) ]] || grep </proc/version -q -i "centos" || grep -q -i "almalinux" /etc/os-release 2>/dev/null || grep -q -i "rocky" /etc/os-release 2>/dev/null; then
         release="centos"
@@ -199,8 +198,9 @@ init_system_environment() {
         exit 1
     fi
 
+    # 仅在初次或环境缺失时安装依赖，平时静默跳过
     if ! command -v jq >/dev/null || ! command -v fuser >/dev/null || ! command -v unzip >/dev/null || ! command -v qrencode >/dev/null || ! command -v iptables >/dev/null || ! command -v numactl >/dev/null || ! command -v ethtool >/dev/null; then
-        echo -e "${YELLOW}[*] 安装核心依赖包 (OS: ${release})...${NC}"
+        echo -e "${YELLOW}[*] 初次运行，正在初始化核心依赖包 (OS: ${release})...${NC}"
         
         if [[ "${release}" == "ubuntu" || "${release}" == "debian" ]]; then
             apt-get update -y -q >/dev/null 2>&1
@@ -234,10 +234,6 @@ init_system_environment() {
 
     IPT=$(command -v iptables || echo "/sbin/iptables")
     has_ipv6 && IPT6=$(command -v ip6tables || echo "/sbin/ip6tables") || IPT6="true"
-    
-    audit_hardware_resources
-    enable_rps_rfs_and_offload
-    calibrate_system_clock
 }
 
 get_architecture() {
@@ -259,7 +255,6 @@ generate_robust_uuid() {
     elif command -v python3 >/dev/null 2>&1; then
         python3 -c "import uuid; print(uuid.uuid4())"
     else
-        echo -e "${YELLOW}[!] 警告: UUID 库异常，切换 /dev/urandom 混淆策略...${NC}" >&2
         tr -dc 'a-f0-9' < /dev/urandom | head -c 32 | sed 's/^\(........\)\(....\)\(....\)\(....\)\(............\)$/\1-\2-\3-\4-\5/'
     fi
 }
@@ -381,11 +376,10 @@ release_ports() {
 
 setup_shortcut() {
     mkdir -p /etc/ddr
-    if [[ ! -f /etc/ddr/aio.sh || "$1" == "update" ]]; then
-        mkdir -p /dev/shm/aio_box_core
-        curl -fLs --connect-timeout 10 https://raw.githubusercontent.com/alariclin/aio-box/main/install.sh > /dev/shm/aio_box_core/aio.sh.tmp && mv /dev/shm/aio_box_core/aio.sh.tmp /etc/ddr/aio.sh
+    # [自愈机制] 如果快捷脚本不存在，或者缺少最新版标识，自动强制从远端下载覆盖！解决报错死循环
+    if [[ ! -f /etc/ddr/aio.sh ]] || ! grep -q "V9.9 Final Perfected (Speed Edition)" /etc/ddr/aio.sh 2>/dev/null || [[ "$1" == "update" ]]; then
+        curl -fLs --connect-timeout 10 "https://raw.githubusercontent.com/alariclin/aio-box/main/install.sh" > /tmp/aio.sh.tmp && mv -f /tmp/aio.sh.tmp /etc/ddr/aio.sh
         chmod +x /etc/ddr/aio.sh
-        rm -rf /dev/shm/aio_box_core
     fi
     if [[ ! -f /usr/local/bin/sb ]]; then
         printf '#!/bin/bash\nsudo bash /etc/ddr/aio.sh "$@"\n' > /usr/local/bin/sb
@@ -542,9 +536,21 @@ pre_install_setup() {
     [[ "$MODE" == *"SS"* || "$MODE" == *"ALL"* ]] && { allowPort "$SS_PORT" "tcp"; allowPort "$SS_PORT" "udp"; }
 }
 
+# ====================================================================
+# 核心部署模块 (调用重资源函数)
+# ====================================================================
 deploy_official_hy2() {
     local IS_SILENT=$1
-    [[ "$IS_SILENT" != "SILENT" ]] && { clear; echo -e "${BOLD}${GREEN} 部署 Hysteria 2 (原生) ${NC}"; init_system_environment; pre_install_setup "hysteria" "HY2"; release_ports; get_architecture; }
+    if [[ "$IS_SILENT" != "SILENT" ]]; then 
+        clear; echo -e "${BOLD}${GREEN} 部署 Hysteria 2 (原生) ${NC}"
+        # 真正开始安装时，才拉起高能效审计和时钟对齐
+        audit_hardware_resources
+        enable_rps_rfs_and_offload
+        calibrate_system_clock
+        pre_install_setup "hysteria" "HY2"
+        release_ports
+        get_architecture
+    fi
     
     mkdir -p /dev/shm/aio_box_core
     fetch_github_release "apernet/hysteria" "hysteria-linux-${HY2_ARCH}" "/dev/shm/aio_box_core/hysteria_core"
@@ -651,7 +657,11 @@ ENV_EOF
 
 deploy_xray() {
     local MODE=$1; clear; echo -e "${BOLD}${GREEN} 部署 Xray-core [$MODE] ${NC}"
-    init_system_environment; pre_install_setup "xray" "$MODE"; release_ports; get_architecture
+    # 按需唤醒底层性能架构
+    audit_hardware_resources
+    enable_rps_rfs_and_offload
+    calibrate_system_clock
+    pre_install_setup "xray" "$MODE"; release_ports; get_architecture
     
     mkdir -p /dev/shm/aio_box_core
     fetch_github_release "XTLS/Xray-core" "Xray-linux-${XRAY_ARCH}.zip" "/dev/shm/aio_box_core/xray_core.zip"
@@ -780,7 +790,11 @@ ENV_EOF
 
 deploy_singbox() {
     local MODE=$1; clear; echo -e "${BOLD}${GREEN} 部署 Sing-box 聚合引擎 [$MODE] ${NC}"
-    init_system_environment; pre_install_setup "singbox" "$MODE"; release_ports; get_architecture
+    # 按需唤醒底层性能架构
+    audit_hardware_resources
+    enable_rps_rfs_and_offload
+    calibrate_system_clock
+    pre_install_setup "singbox" "$MODE"; release_ports; get_architecture
     
     mkdir -p /dev/shm/aio_box_core
     fetch_github_release "SagerNet/sing-box" "linux-${SB_ARCH}.tar.gz" "/dev/shm/aio_box_core/singbox_core.tar.gz"
@@ -1329,6 +1343,10 @@ check_virgin_state() {
 tune_vps() {
     clear; echo -e "${CYAN}注入极限内核优化参数...${NC}"
     
+    # 按需唤醒底层性能架构
+    audit_hardware_resources
+    enable_rps_rfs_and_offload
+    
     cat > /etc/security/limits.d/aio-box.conf <<EOF
 * soft nofile 1048576
 * hard nofile 1048576
@@ -1404,6 +1422,9 @@ vps_benchmark_menu() {
     esac
 }
 
+# ====================================================================
+# 入口点：环境静默初始化并弹出菜单
+# ====================================================================
 init_system_environment
 setup_shortcut
 
