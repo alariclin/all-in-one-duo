@@ -23,7 +23,6 @@
 2. [🏗️ 架构对比](#-arch-cn)
 3. [🚀 快速部署](#-deploy-cn)
 4. [🛠️ 运维与管理](#-ops-cn)
-5. [❓ 常见问题](#-faq-cn)
 
 <a name="-features-cn"></a>
 ### ✨ 核心特性
@@ -81,20 +80,6 @@ sb
 * 16: 一键清空 - 提供物理级完全清场模式，彻底粉碎节点、配置与防火墙规则。
 * 17: 环境自愈 - 扫描死锁、清理脏路由、连通性探测。
 * 18: 流量管控 - 基于 vnstat 监控流量，支持到达月度阈值后自动熔断服务以防超支。
----
-
-<a name="-faq-cn"></a>
-
-### ❓ 常见问题
-
-* **Q: VLESS 节点为什么连上后瞬间断开？**
-  * **A:** 脚本强制启用了 `xtls-rprx-vision`。客户端严禁开启 `Mux`（多路复用），伪装指纹（Fingerprint）必须设置为 `chrome`。
-
-* **Q: 为什么 Alpine 系统上优化内核会失败？**
-  * **A:** 已完美修复此问题。脚本会智能回退并手动注入配置，实现 100% 优化成功率。
-
-* **Q: 卸载会损坏 Docker 规则吗？**
-  * **A:** 绝对不会。脚本采用正则精准锚定清理带有 `Aio-box-` 注释的规则，不使用野蛮的 `iptables -F`。
 
 ---
 ---
@@ -113,7 +98,6 @@ sb
 2. [🏗️ Architecture Comparison](#-architecture-comparison)
 3. [🚀 Quick Start](#-quick-start)
 4. [🛠️ Management & Operations](#-management--operations)
-5. [❓ Frequently Asked Questions](#-frequently-asked-questions-faq)
 
 ---
 <a name="-key-features"></a>
@@ -164,19 +148,6 @@ sb
 * **16**:  One-click Clearing - Provides a physical-level complete clearance mode to completely destroy nodes, configurations, and firewall rules.
 * **17**: Environment Self-healing - Scans for deadlocks, cleans up dirty routes, and conducts connectivity detection.
 * **18**: Traffic Control - Monitors traffic based on vnstat and supports automatic service disconnection upon reaching monthly thresholds to prevent over-consumption.
-
----
-<a name="-frequently-asked-questions-faq"></a>
-### ❓ Frequently Asked Questions
-
-* **Q: Why does the VLESS node disconnect immediately after connecting?**
-  * **A:** The VLESS deployment strictly enforces `xtls-rprx-vision` flow control. In your client (e.g., Shadowrocket, v2rayN), you **must not enable** `Mux` (multiplexing), or the packets will be dropped by the Vision filter. Additionally, ensure the camouflage fingerprint (uTLS/Fingerprint) is strictly set to `chrome`.
-
-* **Q: Why does kernel optimization fail on Alpine systems?**
-  * **A:** Standard `sysctl --system` is unsupported on Busybox-based Alpine. However, Aio-box has resolved this; the script intelligently falls back to traversing and injecting config files manually, achieving a 100% success rate.
-
-* **Q: Will uninstallation break my Docker forwarding rules?**
-  * **A:** Absolutely not. The script uses precise regex anchoring (only deleting rules with `Aio-box-` comments and specific port range redirects). It never uses "brute force" commands like `iptables -F`, perfectly preserving the host's native ecosystem.
 
 ---
 
