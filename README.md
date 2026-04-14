@@ -170,4 +170,4 @@ sb
 If you encounter any issues or have suggestions, please submit them via:
 * [GitHub Issues](https://github.com/alariclin/aio-box/issues)
 ## 📄 许可证 / License
-Released under the [MIT License](https://opensource.org/licenses/MIT).
+[MIT License](https://opensource.org/licenses/MIT).
