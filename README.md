@@ -94,7 +94,11 @@ sb
 
 **Aio-box** It is an automated network encryption tunnel deployment script specifically designed for Linux servers. It integrates the current mainstream network security proxy protocols (such as VLESS-Reality, Shadowsocks-2022, Hysteria 2, etc.), aiming to help users quickly set up a secure, private and efficient cross-domain data transmission environment, while providing system-level optimization and anti-blockage self-healing mechanisms.
 
-> **⚠️ Compliance & Disclaimer**: This project is positioned as a tool for enterprise-level network architecture testing, cybersecurity research, and personal privacy protection. It is strictly prohibited to use this script for any activities that violate the laws and regulations of the country or region where you are located. Users must bear all direct and indirect legal responsibilities arising from improper use on their own.
+> ⚠️ Compliance & Disclaimer：This project is positioned as an automated tool for network architecture testing, cybersecurity research, and personal privacy protection.
+> 1. Legal Compliance: It is strictly prohibited to use the scripts and technologies provided by this project for any activities that violate the laws and regulations of your country or region. Users must ensure their actions comply with local telecommunications, cybersecurity, and internet service regulations.
+> 2. Limitation of Liability: This project is intended for technical exchange, protocol research, and legitimate privacy enhancement under authorized environments. The user shall bear full responsibility for any legal consequences or security risks arising from non-compliance or improper use. The developers shall not be held liable for any such actions.
+> 3. Technical Intent: The encryption protocols and routing technologies involved are designed to enhance data transmission security. Use of this tool for illegal attacks, unauthorized network access, or endangering network infrastructure is strictly forbidden.
+> 4. Acceptance of Terms: By downloading, copying, or running this script, you acknowledge that you have read, understood, and agreed to all terms of this disclaimer.
 
 ---
 
