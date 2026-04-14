@@ -2,7 +2,7 @@
 
 - **[📖 中文说明](#-中文说明) | [🌐 English Description](#-english-description)**
 - **致谢:** 感谢开源社区中优秀的网络路由与加密项目（如 Xray-core、Sing-box、Hysteria 等）提供的底层技术启发与支持。本项目为独立的学习与自动化运维工具。
-- Credits： We express our gratitude to excellent open-source projects for their technical inspiration. This project is an independent tool for learning and automated deployment.
+- Credits：Thanks to the excellent network routing and encryption projects in the open-source community (such as Xray-core, Sing-box, Hysteria, etc.) for providing the underlying technical inspiration and support. This project is an independent learning and automated operation and maintenance tool..
 
 [![Version](https://img.shields.io/badge/Version-Apex_V56-success.svg?style=flat-square)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT)
