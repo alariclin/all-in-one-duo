@@ -1378,7 +1378,7 @@ while true; do
     echo -e " ${GREEN}16.${NC} 一键全部清空卸载 / One-click to completely clear and uninstall"
     echo -e " ${GREEN}17.${NC} 删除全部节点与环境初始化 / Delete all nodes and perform environment initialization"
     echo -e " ${GREEN}18.${NC} 每月流量管控限制 / Monthly Traffic Management Limit"
-    echo -e " ${GREEN}0 .${NC} 退出脚本 / Exit Script"
+    echo -e " ${GREEN} 0.${NC} 退出脚本 / Exit Script"
     echo -e "${BLUE}======================================================================${NC}"
     read -ep " 请求下发执行代号 / Request input command: " choice
     
