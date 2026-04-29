@@ -904,9 +904,20 @@ traffic_management_menu() {
     [[ -z "$INTERFACE" ]] && INTERFACE=$(ip link | awk -F: '$0 !~ "lo|vir|wl|^[^0-9]"{print $2;getline}' | head -n 1 | tr -d ' ')
     
     echo -e "${YELLOW}[网卡 (Interface) ${INTERFACE} 当前月流量统计 / Current Month Traffic Statistics]${NC}"
+    
+    # === 新增：优雅的中英文数据释义图例 ===
+    echo -e "${CYAN} ► rx (Receive)  : 下行下载流量 / Download (Inbound to VPS)${NC}"
+    echo -e "${CYAN} ► tx (Transmit) : 上行上传流量 / Upload (Outbound from VPS)${NC}"
+    echo -e "${CYAN} ► total (Total) : 计费总消耗量 / Total Usage (Usually billed data)${NC}"
+    echo -e "${BLUE}----------------------------------------------------------------------${NC}"
+    
     if command -v vnstat >/dev/null 2>&1; then
         local USED_LINE=$(vnstat -i "$INTERFACE" -m 2>/dev/null | grep "$(date +'%Y-%m')")
-        if [[ -n "$USED_LINE" ]]; then vnstat -i "$INTERFACE" -m 2>/dev/null | head -n 6 | grep -v '^$'; else echo -e "${YELLOW}暂无本月统计数据，vnstat 正在收集中... / No data for this month yet, vnstat is collecting...${NC}"; fi
+        if [[ -n "$USED_LINE" ]]; then 
+            vnstat -i "$INTERFACE" -m 2>/dev/null | head -n 6 | grep -v '^$'
+        else 
+            echo -e "${YELLOW}暂无本月统计数据，vnstat 正在收集中... / No data for this month yet, vnstat is collecting...${NC}"
+        fi
     else
         echo -e "${RED}[!] 未检测到 vnstat，请确保环境已初始化。 / vnstat not detected, ensure environment is initialized.${NC}"
     fi
@@ -921,11 +932,11 @@ traffic_management_menu() {
     echo -e "${CYAN}======================================================================${NC}"
     echo -e "${YELLOW}1. 设定/修改每月流量上限 (Set/Modify Monthly Traffic Limit)${NC}\n${YELLOW}2. 解除流量限制 (Disable Traffic Limit)${NC}\n${GREEN}0. 返回主菜单 / Return to Main Menu${NC}"
     echo -e "${CYAN}======================================================================${NC}"
-    read -ep " 请选择 / Select [0-2]: " tr_choice
+    read -p " 请选择 / Select [0-2]: " tr_choice
     
     case $tr_choice in
         1)
-            read -ep " 请输入每月总流量上限(GB)，纯数字 / Enter monthly traffic limit (GB), numbers only: " limit_gb
+            read -p " 请输入每月总流量上限(GB)，纯数字 / Enter monthly traffic limit (GB), numbers only: " limit_gb
             if [[ "$limit_gb" =~ ^[0-9]+$ ]]; then
                 sed -i '/TRAFFIC_LIMIT_GB/d' /etc/ddr/.env 2>/dev/null
                 echo "TRAFFIC_LIMIT_GB=\"$limit_gb\"" >> /etc/ddr/.env
@@ -934,13 +945,13 @@ traffic_management_menu() {
             else
                 echo -e "${RED}[!] 输入无效，请输入纯数字。 / Invalid input, please enter numbers only.${NC}"
             fi
-            read -ep "按回车返回 / Press Enter to return..."
+            read -p "按回车返回 / Press Enter to return..."
             ;;
         2)
             sed -i '/TRAFFIC_LIMIT_GB/d' /etc/ddr/.env 2>/dev/null
             disable_traffic_monitor
             echo -e "${GREEN}✔ 流量限制已成功解除。 / Traffic limit successfully disabled.${NC}"
-            read -ep "按回车返回 / Press Enter to return..."
+            read -p "按回车返回 / Press Enter to return..."
             ;;
         *) return 0 ;;
     esac
