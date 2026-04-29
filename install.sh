@@ -908,7 +908,7 @@ traffic_management_menu() {
     echo -e "${CYAN} ► rx (Receive)  : 入站流量 / Inbound (Data flowing INTO the VPS)${NC}"
     echo -e "${CYAN} ► tx (Transmit) : 出站流量 / Outbound (Data flowing FROM the VPS)${NC}"
     echo -e "${CYAN} ► total (Total) : 总吞吐量 / Total (Sum of Inbound and Outbound)${NC}"
-    echo -e "${MAGENTA} [提示] AWS/GCP 计费通常仅针对 tx (出站) 流量收费。${NC}"
+    echo -e "${MAGENTA} [提示] VPS 计费通常仅针对 tx (出站) 流量收费/The VPS billing is usually charged only for tx (outbound) traffic${NC}"
     echo -e "${BLUE}----------------------------------------------------------------------${NC}"
     
     if command -v vnstat >/dev/null 2>&1; then
@@ -1363,10 +1363,10 @@ while true; do
     clear; echo -e "${BLUE}======================================================================${NC}\n${BOLD}${YELLOW} ==============================Aio-box===============================${NC}\n${BLUE}======================================================================${NC}"
     echo -e " 网关/Gateway: ${YELLOW}$GLOBAL_PUBLIC_IP${NC} | 核心/Core: $STATUS_STR $CUR_MODE\n${BLUE}----------------------------------------------------------------------${NC}"
     echo -e " ${YELLOW}[ Xray-core 部署/Deployment ]${NC} ${YELLOW}[ Sing-box 部署/Deployment ]${NC}"
-    echo -e " ${GREEN}1.${NC} VLESS-Reality ${GREEN}6.${NC} VLESS-Reality"
-    echo -e " ${GREEN}2.${NC} Shadowsocks-2022 ${GREEN}7.${NC} Shadowsocks-2022"
-    echo -e " ${GREEN}3.${NC} VLESS + SS-2022 ${GREEN}8.${NC} VLESS + SS-2022"
-    echo -e " ${GREEN}4.${NC} Hysteria 2 (原生/Apernet) ${GREEN}9.${NC} Hysteria 2 (Sing-box)"
+    echo -e " ${GREEN}1.${NC} VLESS-Reality ${GREEN}             6.${NC} VLESS-Reality"
+    echo -e " ${GREEN}2.${NC} Shadowsocks-2022 ${GREEN}          7.${NC} Shadowsocks-2022"
+    echo -e " ${GREEN}3.${NC} VLESS + SS-2022 ${GREEN}           8.${NC} VLESS + SS-2022"
+    echo -e " ${GREEN}4.${NC} Hysteria 2 (原生/Apernet) ${GREEN}  9.${NC} Hysteria 2 (Sing-box)"
     echo -e " ${GREEN}5.${NC} 全协议三合一/All (Xray+Hy2) ${GREEN}10.${NC} 全协议三合一/All (Sing-box)"
     echo -e "${BLUE}----------------------------------------------------------------------${NC}"
     echo -e " ${GREEN}11.${NC} 本机配置与IP测速纯净度 / The purity of local configuration and IP speed test"
