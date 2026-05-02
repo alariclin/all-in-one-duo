@@ -172,13 +172,13 @@ clean_nat_rules() {
     while $IPT -w -t nat -S PREROUTING 2>/dev/null | grep -q "30000:60000"; do
         local LOCAL_RULE=$($IPT -w -t nat -S PREROUTING 2>/dev/null | grep "30000:60000" | head -n 1 | sed 's/^-A /-D /')
         [[ -z "$LOCAL_RULE" ]] && break
-        eval $IPT -w -t nat $LOCAL_RULE 2>/dev/null || break
+        $IPT -w -t nat $LOCAL_RULE 2>/dev/null || break
     done
     if has_ipv6; then
         while $IPT6 -w -t nat -S PREROUTING 2>/dev/null | grep -q "30000:60000"; do
             local LOCAL_RULE6=$($IPT6 -w -t nat -S PREROUTING 2>/dev/null | grep "30000:60000" | head -n 1 | sed 's/^-A /-D /')
             [[ -z "$LOCAL_RULE6" ]] && break
-            eval $IPT6 -w -t nat $LOCAL_RULE6 2>/dev/null || break
+            $IPT6 -w -t nat $LOCAL_RULE6 2>/dev/null || break
         done
     fi
 }
@@ -186,13 +186,13 @@ clean_input_rules() {
     while $IPT -w -S INPUT 2>/dev/null | grep -q "Aio-box-"; do
         local LOCAL_RULE=$($IPT -w -S INPUT 2>/dev/null | grep "Aio-box-" | head -n 1 | sed 's/^-A /-D /')
         [[ -z "$LOCAL_RULE" ]] && break
-        eval $IPT -w $LOCAL_RULE 2>/dev/null || break
+        $IPT -w $LOCAL_RULE 2>/dev/null || break
     done
     if has_ipv6; then
         while $IPT6 -w -S INPUT 2>/dev/null | grep -q "Aio-box-"; do
             local LOCAL_RULE6=$($IPT6 -w -S INPUT 2>/dev/null | grep "Aio-box-" | head -n 1 | sed 's/^-A /-D /')
             [[ -z "$LOCAL_RULE6" ]] && break
-            eval $IPT6 -w $LOCAL_RULE6 2>/dev/null || break
+            $IPT6 -w $LOCAL_RULE6 2>/dev/null || break
         done
     fi
 }
@@ -217,7 +217,7 @@ release_ports() {
 setup_shortcut() {
     mkdir -p /etc/ddr
     if [[ ! -f /etc/ddr/aio.sh || "$1" == "update" ]]; then
-        curl -fLs --connect-timeout 10 https://raw.githubusercontent.com/alariclin/aio-box/main/install.sh > /dev/shm/aio.sh.tmp && mv -f /dev/shm/aio.sh.tmp /etc/ddr/aio.sh
+        curl -fLs --connect-timeout 10 https://raw.githubusercontent.com/alariclin/aio-box/main/install.sh > /tmp/aio.sh.tmp && mv -f /tmp/aio.sh.tmp /etc/ddr/aio.sh
         chmod +x /etc/ddr/aio.sh
     fi
     if [[ ! -f /usr/local/bin/sb ]]; then
@@ -234,6 +234,7 @@ setup_active_defense() {
 
     cat > /etc/logrotate.d/aio-box << 'EOF'
 /var/log/aio-box-*.log {
+    su root root
     daily
     rotate 2
     size 50M
@@ -278,6 +279,26 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 source /etc/ddr/.env 2>/dev/null || exit 0
 [[ -z "$CORE" ]] && exit 0
 
+if [[ -n "$TRAFFIC_LIMIT_GB" ]]; then
+    INTERFACE=$(ip route get 8.8.8.8 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="dev") print $(i+1)}' | head -n 1)
+    [[ -z "$INTERFACE" ]] && INTERFACE=$(ip link | awk -F: '$0 !~ "lo|vir|wl|^[^0-9]"{print $2;getline}' | head -n 1 | tr -d ' ')
+    USED_LINE=$(vnstat -i "$INTERFACE" -m 2>/dev/null | grep "$(date +'%Y-%m')")
+    if [[ -n "$USED_LINE" ]]; then
+        TOTAL_STR=$(echo "$USED_LINE" | awk -F'|' '{print $3}' | xargs)
+        VAL=$(echo "$TOTAL_STR" | awk '{print $1}')
+        UNIT=$(echo "$TOTAL_STR" | awk '{print $2}')
+        USED_GB=0
+        if [[ "$UNIT" == *"GiB"* || "$UNIT" == *"GB"* ]]; then USED_GB=$VAL
+        elif [[ "$UNIT" == *"TiB"* || "$UNIT" == *"TB"* ]]; then USED_GB=$(echo "$VAL * 1024" | bc)
+        elif [[ "$UNIT" == *"MiB"* || "$UNIT" == *"MB"* ]]; then USED_GB=$(echo "scale=2; $VAL / 1024" | bc)
+        elif [[ "$UNIT" == *"KiB"* || "$UNIT" == *"KB"* ]]; then USED_GB=$(echo "scale=4; $VAL / 1048576" | bc)
+        fi
+        if (( $(echo "$USED_GB >= $TRAFFIC_LIMIT_GB" | bc -l) )); then
+            exit 0
+        fi
+    fi
+fi
+
 check_restart() {
     local srv=$1
     if command -v systemctl >/dev/null 2>&1; then
@@ -303,7 +324,7 @@ if [[ "$CORE" == "xray" || "$CORE" == "singbox" || "$CORE" == "hysteria" ]]; the
 fi
 EOF
     chmod +x /etc/ddr/socket_probe.sh
-    crontab -l 2>/dev/null | grep -v '/etc/ddr/socket_probe.sh' > /tmp/cronjob || true
+    crontab -l 2>/dev/null | grep -vE "^no crontab for|^#" | grep -v '/etc/ddr/socket_probe.sh' > /tmp/cronjob || true
     echo "* * * * * /bin/bash /etc/ddr/socket_probe.sh >/dev/null 2>&1" >> /tmp/cronjob
     crontab /tmp/cronjob 2>/dev/null; rm -f /tmp/cronjob
 }
@@ -315,30 +336,30 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 GEOIP_URL="https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat"
 GEOSITE_URL="https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat"
 
-mkdir -p /dev/shm/geo_update
-curl -sL -m 60 "$GEOIP_URL" -o /dev/shm/geo_update/geoip.dat || curl -sL -m 60 "https://ghp.ci/$GEOIP_URL" -o /dev/shm/geo_update/geoip.dat
-curl -sL -m 60 "$GEOSITE_URL" -o /dev/shm/geo_update/geosite.dat || curl -sL -m 60 "https://ghp.ci/$GEOSITE_URL" -o /dev/shm/geo_update/geosite.dat
+mkdir -p /tmp/geo_update
+curl -sL -m 60 "$GEOIP_URL" -o /tmp/geo_update/geoip.dat || curl -sL -m 60 "https://ghp.ci/$GEOIP_URL" -o /tmp/geo_update/geoip.dat
+curl -sL -m 60 "$GEOSITE_URL" -o /tmp/geo_update/geosite.dat || curl -sL -m 60 "https://ghp.ci/$GEOSITE_URL" -o /tmp/geo_update/geosite.dat
 
-SIZE_IP=$(wc -c < /dev/shm/geo_update/geoip.dat 2>/dev/null | tr -d ' ')
-SIZE_SITE=$(wc -c < /dev/shm/geo_update/geosite.dat 2>/dev/null | tr -d ' ')
+SIZE_IP=$(wc -c < /tmp/geo_update/geoip.dat 2>/dev/null | tr -d ' ')
+SIZE_SITE=$(wc -c < /tmp/geo_update/geosite.dat 2>/dev/null | tr -d ' ')
 
 if [[ -n "$SIZE_IP" && "$SIZE_IP" -gt 500000 && -n "$SIZE_SITE" && "$SIZE_SITE" -gt 500000 ]]; then
     if [[ -d "/usr/local/share/xray" ]]; then
-        mv -f /dev/shm/geo_update/geoip.dat /usr/local/share/xray/geoip.dat
-        mv -f /dev/shm/geo_update/geosite.dat /usr/local/share/xray/geosite.dat
+        mv -f /tmp/geo_update/geoip.dat /usr/local/share/xray/geoip.dat
+        mv -f /tmp/geo_update/geosite.dat /usr/local/share/xray/geosite.dat
         if command -v systemctl >/dev/null 2>&1; then systemctl restart xray 2>/dev/null; else rc-service xray restart 2>/dev/null; fi
     fi
     if [[ -d "/etc/sing-box" ]]; then
-        cp -f /usr/local/share/xray/geoip.dat /etc/sing-box/geoip.dat 2>/dev/null || mv -f /dev/shm/geo_update/geoip.dat /etc/sing-box/geoip.dat 2>/dev/null
-        cp -f /usr/local/share/xray/geosite.dat /etc/sing-box/geosite.dat 2>/dev/null || mv -f /dev/shm/geo_update/geosite.dat /etc/sing-box/geosite.dat 2>/dev/null
+        cp -f /usr/local/share/xray/geoip.dat /etc/sing-box/geoip.dat 2>/dev/null || mv -f /tmp/geo_update/geoip.dat /etc/sing-box/geoip.dat 2>/dev/null
+        cp -f /usr/local/share/xray/geosite.dat /etc/sing-box/geosite.dat 2>/dev/null || mv -f /tmp/geo_update/geosite.dat /etc/sing-box/geosite.dat 2>/dev/null
         if command -v systemctl >/dev/null 2>&1; then systemctl restart sing-box 2>/dev/null; else rc-service sing-box restart 2>/dev/null; fi
     fi
 fi
-rm -rf /dev/shm/geo_update
+rm -rf /tmp/geo_update
 EOF
     chmod +x /etc/ddr/geo_update.sh
     
-    crontab -l 2>/dev/null | grep -v '/etc/ddr/geo_update.sh' > /tmp/cronjob || true
+    crontab -l 2>/dev/null | grep -vE "^no crontab for|^#" | grep -v '/etc/ddr/geo_update.sh' > /tmp/cronjob || true
     echo "0 3 * * 1 /bin/bash /etc/ddr/geo_update.sh >/dev/null 2>&1" >> /tmp/cronjob
     crontab /tmp/cronjob 2>/dev/null
     rm -f /tmp/cronjob
@@ -349,10 +370,10 @@ fetch_github_release() {
     local repo=$1; local keyword=$2; local output_file=$3
     echo -e "${YELLOW} -> 正在从 GitHub 抓取最新架构版本 / Fetching latest release [${repo}]...${NC}"
     local api_url="https://api.github.com/repos/${repo}/releases/latest"
-    local download_url=$(curl -sL "$api_url" | jq -r ".assets[] | select(.name | contains(\"$keyword\")) | .browser_download_url" | head -n 1)
+    local download_url=$(curl -sL "$api_url" | jq -r ".assets[]? | select(.name | contains(\"$keyword\")) | .browser_download_url" 2>/dev/null | head -n 1)
     
     if [[ -z "$download_url" || "$download_url" == "null" ]]; then
-        download_url=$(curl -sL "https://ghp.ci/$api_url" | jq -r ".assets[] | select(.name | contains(\"$keyword\")) | .browser_download_url" | head -n 1)
+        download_url=$(curl -sL "https://ghp.ci/$api_url" | jq -r ".assets[]? | select(.name | contains(\"$keyword\")) | .browser_download_url" 2>/dev/null | head -n 1)
     fi
     if [[ -z "$download_url" || "$download_url" == "null" ]]; then
         echo -e "${YELLOW} -> API 探测失败，自动降级至本地备用仓库拉取... / API failed, fallback to local core repo...${NC}"
@@ -365,7 +386,7 @@ fetch_github_release() {
         if [[ -n "$fallback_url" ]]; then
             local mirrors=("" "https://ghp.ci/" "https://mirror.ghproxy.com/")
             for mirror in "${mirrors[@]}"; do
-                if curl -fLs --connect-timeout 10 "${mirror}${fallback_url}" -o "/dev/shm/${output_file}" && [[ -s "/dev/shm/${output_file}" ]]; then
+                if curl -fLs --connect-timeout 10 "${mirror}${fallback_url}" -o "/tmp/${output_file}" && [[ -s "/tmp/${output_file}" ]]; then
                     echo -e "${GREEN}   ✔ 核心资产从备用仓库提取成功！ / Asset fetched from fallback repo!${NC}"; return 0
                 fi
             done
@@ -374,7 +395,7 @@ fetch_github_release() {
     fi
     local mirrors=("" "https://ghp.ci/" "https://mirror.ghproxy.com/")
     for mirror in "${mirrors[@]}"; do
-        if curl -fLs --connect-timeout 10 "${mirror}${download_url}" -o "/dev/shm/${output_file}" && [[ -s "/dev/shm/${output_file}" ]]; then
+        if curl -fLs --connect-timeout 10 "${mirror}${download_url}" -o "/tmp/${output_file}" && [[ -s "/tmp/${output_file}" ]]; then
             echo -e "${GREEN}   ✔ 核心资产提取成功！ / Asset successfully fetched!${NC}"; return 0
         fi
     done
@@ -389,7 +410,7 @@ fetch_github_release() {
     if [[ -n "$fallback_url" ]]; then
         local mirrors=("" "https://ghp.ci/" "https://mirror.ghproxy.com/")
         for mirror in "${mirrors[@]}"; do
-            if curl -fLs --connect-timeout 10 "${mirror}${fallback_url}" -o "/dev/shm/${output_file}" && [[ -s "/dev/shm/${output_file}" ]]; then
+            if curl -fLs --connect-timeout 10 "${mirror}${fallback_url}" -o "/tmp/${output_file}" && [[ -s "/tmp/${output_file}" ]]; then
                 echo -e "${GREEN}   ✔ 核心资产从备用仓库提取成功！ / Asset fetched from fallback repo!${NC}"; return 0
             fi
         done
@@ -400,13 +421,13 @@ fetch_geo_data() {
     local file_name=$1; local official_url=$2
     local mirrors=("" "https://ghp.ci/" "https://mirror.ghproxy.com/")
     for mirror in "${mirrors[@]}"; do
-        if curl -fLs --connect-timeout 10 "${mirror}${official_url}" -o "/dev/shm/${file_name}" && [[ -s "/dev/shm/${file_name}" ]]; then return 0; fi
+        if curl -fLs --connect-timeout 10 "${mirror}${official_url}" -o "/tmp/${file_name}" && [[ -s "/tmp/${file_name}" ]]; then return 0; fi
     done
     
     echo -e "${YELLOW} -> 官方 Geo 数据下载失败，自动降级至备用仓库拉取... / Official Geo failed, fallback to local repo...${NC}"
     local fallback_geo_url="https://raw.githubusercontent.com/alariclin/aio-box/main/core/${file_name}"
     for mirror in "${mirrors[@]}"; do
-        if curl -fLs --connect-timeout 10 "${mirror}${fallback_geo_url}" -o "/dev/shm/${file_name}" && [[ -s "/dev/shm/${file_name}" ]]; then
+        if curl -fLs --connect-timeout 10 "${mirror}${fallback_geo_url}" -o "/tmp/${file_name}" && [[ -s "/tmp/${file_name}" ]]; then
             echo -e "${GREEN}   ✔ Geo 数据从备用仓库提取成功！ / Geo data fetched from fallback repo!${NC}"; return 0
         fi
     done
@@ -474,7 +495,7 @@ deploy_official_hy2() {
     [[ "$IS_SILENT" != "SILENT" ]] && { clear; echo -e "${BOLD}${GREEN} 部署官方 Hysteria 2 / Deploying Native Hy2 ${NC}"; init_system_environment; pre_install_setup "hysteria" "HY2"; release_ports; get_architecture; }
     
     fetch_github_release "apernet/hysteria" "hysteria-linux-${HY2_ARCH}" "hysteria_core"
-    mv /dev/shm/hysteria_core /usr/local/bin/hysteria; chmod +x /usr/local/bin/hysteria
+    mv /tmp/hysteria_core /usr/local/bin/hysteria; chmod +x /usr/local/bin/hysteria
     
     HY2_PASS=$(openssl rand -base64 12 | tr -dc 'a-zA-Z0-9'); HY2_OBFS=$(openssl rand -base64 8 | tr -dc 'a-zA-Z0-9')
     
@@ -579,15 +600,15 @@ deploy_xray() {
     local MODE=$1; clear; echo -e "${BOLD}${GREEN} 部署 Xray-core (Hybrid模式) / Deploying Xray-core [$MODE] ${NC}"
     init_system_environment; pre_install_setup "xray" "$MODE"; release_ports; get_architecture
     
-    rm -rf /dev/shm/xray_ext /dev/shm/xray_core.zip 2>/dev/null
+    rm -rf /tmp/xray_ext /tmp/xray_core.zip 2>/dev/null
     fetch_github_release "XTLS/Xray-core" "Xray-linux-${XRAY_ARCH}.zip" "xray_core.zip"
     fetch_geo_data "geoip.dat" "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat"
     fetch_geo_data "geosite.dat" "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat"
     
-    unzip -qo "/dev/shm/xray_core.zip" -d /dev/shm/xray_ext || { echo -e "${RED}[!] 异常: 压缩包损坏或解压失败！${NC}"; exit 1; }
-    mv /dev/shm/xray_ext/xray /usr/local/bin/xray; chmod +x /usr/local/bin/xray
+    unzip -qo "/tmp/xray_core.zip" -d /tmp/xray_ext || { echo -e "${RED}[!] 异常: 压缩包损坏或解压失败！${NC}"; exit 1; }
+    mv /tmp/xray_ext/xray /usr/local/bin/xray; chmod +x /usr/local/bin/xray
     mkdir -p /usr/local/share/xray /usr/local/etc/xray
-    mv /dev/shm/geoip.dat /usr/local/share/xray/; mv /dev/shm/geosite.dat /usr/local/share/xray/
+    mv /tmp/geoip.dat /usr/local/share/xray/; mv /tmp/geosite.dat /usr/local/share/xray/
     
     KEYPAIR=$(/usr/local/bin/xray x25519)
     PK=$(echo "$KEYPAIR" | grep -i "Private" | awk '{print $NF}')
@@ -697,15 +718,17 @@ deploy_singbox() {
     local MODE=$1; clear; echo -e "${BOLD}${GREEN} 部署 Sing-box 核心 / Deploying Sing-box [$MODE] ${NC}"
     init_system_environment; pre_install_setup "singbox" "$MODE"; release_ports; get_architecture
     
-    rm -rf /dev/shm/sing-box-* /dev/shm/singbox_core.tar.gz /dev/shm/sing-box 2>/dev/null
+    rm -rf /tmp/sing-box-* /tmp/singbox_core.tar.gz /tmp/sing-box 2>/dev/null
     fetch_github_release "SagerNet/sing-box" "linux-${SB_ARCH}.tar.gz" "singbox_core.tar.gz"
-    tar -xzf "/dev/shm/singbox_core.tar.gz" -C /dev/shm || { echo -e "${RED}[!] 异常: 压缩包损坏或解压失败！${NC}"; exit 1; }
+    tar -xzf "/tmp/singbox_core.tar.gz" -C /tmp || { echo -e "${RED}[!] 异常: 压缩包损坏或解压失败！${NC}"; exit 1; }
     
-    # [修复] 加大搜索层级，防止官方压缩包结构变更导致拉取不到核心
-    if [[ -f /dev/shm/sing-box ]]; then
-        mv /dev/shm/sing-box /usr/local/bin/sing-box
+    if [[ -f /tmp/sing-box ]]; then
+        mv /tmp/sing-box /usr/local/bin/sing-box
     else
-        find /dev/shm/sing-box-* -maxdepth 2 -type f -name "sing-box" -exec mv {} /usr/local/bin/sing-box \; -quit 2>/dev/null
+        local SB_PATH=$(find /tmp/sing-box-* -maxdepth 2 -type f -name "sing-box" 2>/dev/null | head -n 1)
+        if [[ -n "$SB_PATH" ]]; then
+            mv "$SB_PATH" /usr/local/bin/sing-box
+        fi
     fi
     chmod +x /usr/local/bin/sing-box
     KEYPAIR=$(/usr/local/bin/sing-box generate reality-keypair)
@@ -886,12 +909,12 @@ if [[ -n "$USED_LINE" ]]; then
 fi
 EOF
     chmod +x /etc/ddr/traffic_monitor.sh
-    crontab -l 2>/dev/null | grep -v '/etc/ddr/traffic_monitor.sh' > /tmp/cronjob || true
+    crontab -l 2>/dev/null | grep -vE "^no crontab for|^#" | grep -v '/etc/ddr/traffic_monitor.sh' > /tmp/cronjob || true
     echo "* * * * * /bin/bash /etc/ddr/traffic_monitor.sh >/dev/null 2>&1" >> /tmp/cronjob
     crontab /tmp/cronjob 2>/dev/null; rm -f /tmp/cronjob
 }
 disable_traffic_monitor() {
-    crontab -l 2>/dev/null | grep -v '/etc/ddr/traffic_monitor.sh' > /tmp/cronjob || true
+    crontab -l 2>/dev/null | grep -vE "^no crontab for|^#" | grep -v '/etc/ddr/traffic_monitor.sh' > /tmp/cronjob || true
     crontab /tmp/cronjob 2>/dev/null; rm -f /tmp/cronjob /etc/ddr/traffic_monitor.sh
 }
 traffic_management_menu() {
@@ -1145,7 +1168,7 @@ do_cleanup() {
     rm -f /etc/init.d/xray /etc/init.d/sing-box /etc/init.d/hysteria
     rm -f /etc/sysctl.d/99-aio-box-tune.conf /etc/security/limits.d/aio-box.conf
     
-    crontab -l 2>/dev/null | grep -vE '/etc/ddr/traffic_monitor.sh|/etc/ddr/geo_update.sh|/etc/ddr/socket_probe.sh' > /tmp/cronjob || true
+    crontab -l 2>/dev/null | grep -vE "^no crontab for|^#" | grep -vE '/etc/ddr/traffic_monitor.sh|/etc/ddr/geo_update.sh|/etc/ddr/socket_probe.sh' > /tmp/cronjob || true
     crontab /tmp/cronjob 2>/dev/null; rm -f /tmp/cronjob /etc/ddr/traffic_monitor.sh /etc/ddr/geo_update.sh /etc/ddr/socket_probe.sh
     rm -rf /var/log/aio-box-*.log /etc/fail2ban/jail.d/aio-box.local /etc/fail2ban/filter.d/aio-box.conf /etc/logrotate.d/aio-box 2>/dev/null
     [[ "$INIT_SYS" == "systemd" ]] && systemctl restart fail2ban 2>/dev/null || true
@@ -1364,9 +1387,9 @@ while true; do
     clear; echo -e "${BLUE}======================================================================${NC}\n${BOLD}${YELLOW} ==============================Aio-box===============================${NC}\n${BLUE}======================================================================${NC}"
     echo -e " 网关/Gateway: ${YELLOW}$GLOBAL_PUBLIC_IP${NC} | 核心/Core: $STATUS_STR $CUR_MODE\n${BLUE}----------------------------------------------------------------------${NC}"
     echo -e " ${YELLOW}[ Xray-core 部署/Deployment ]${NC} ${YELLOW}[ Sing-box 部署/Deployment ]${NC}"
-    echo -e " ${GREEN}1.${NC} VLESS-Reality ${GREEN}               6.${NC} VLESS-Reality"
-    echo -e " ${GREEN}2.${NC} Shadowsocks-2022 ${GREEN}            7.${NC} Shadowsocks-2022"
-    echo -e " ${GREEN}3.${NC} VLESS + SS-2022 ${GREEN}             8.${NC} VLESS + SS-2022"
+    echo -e " ${GREEN}1.${NC} VLESS-Reality ${GREEN}                6.${NC} VLESS-Reality"
+    echo -e " ${GREEN}2.${NC} Shadowsocks-2022 ${GREEN}             7.${NC} Shadowsocks-2022"
+    echo -e " ${GREEN}3.${NC} VLESS + SS-2022 ${GREEN}              8.${NC} VLESS + SS-2022"
     echo -e " ${GREEN}4.${NC} Hysteria 2 (原生/Apernet) ${GREEN}   9.${NC} Hysteria 2 (Sing-box)"
     echo -e " ${GREEN}5.${NC} 全协议三合一/All (Xray+Hy2) ${GREEN}10.${NC} 全协议三合一/All (Sing-box)"
     echo -e "${BLUE}----------------------------------------------------------------------${NC}"
