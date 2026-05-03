@@ -47,10 +47,10 @@ tr_msg() {
         en:lang_title) echo 'Language Settings / 语言设置' ;;
         zh:lang_saved) echo '语言已保存。' ;;
         en:lang_saved) echo 'Language saved.' ;;
-        zh:yes_no_default_no) echo '[y/N]' ;;
-        en:yes_no_default_no) echo '[y/N]' ;;
-        zh:yes_no_default_yes) echo '[Y/n]' ;;
-        en:yes_no_default_yes) echo '[Y/n]' ;;
+        zh:yes_no_default_no) echo '[Y/N]' ;;
+        en:yes_no_default_no) echo '[Y/N]' ;;
+        zh:yes_no_default_yes) echo '[Y/N]' ;;
+        en:yes_no_default_yes) echo '[Y/N]' ;;
         zh:reality_sni_prompt) echo '   [%s] 请输入伪装 SNI (端口 %s，回车默认: %s): ' ;;
         en:reality_sni_prompt) echo '   [%s] Enter camouflage SNI (port %s, default: %s): ' ;;
         zh:bad_sni) echo 'SNI 格式非法: %s' ;;
@@ -67,8 +67,8 @@ tr_msg() {
         en:bad_port) echo 'Invalid port: %s' ;;
         zh:toolbox_title) echo '综合工具箱 / Toolbox' ;;
         en:toolbox_title) echo 'Toolbox / 综合工具箱' ;;
-        zh:confirm_remote) echo '即将远程执行第三方脚本：%s。确认执行？[y/N]: ' ;;
-        en:confirm_remote) echo 'About to run third-party remote script: %s. Continue? [y/N]: ' ;;
+        zh:confirm_remote) echo '即将远程执行第三方脚本：%s。确认执行？[Y/N]: ' ;;
+        en:confirm_remote) echo 'About to run third-party remote script: %s. Continue? [Y/N]: ' ;;
         zh:swap_exists) echo '检测到 /swapfile 已存在，跳过创建。' ;;
         en:swap_exists) echo '/swapfile already exists; creation skipped.' ;;
         zh:swap_done) echo 'Swap 处理完成。' ;;
@@ -379,7 +379,7 @@ verify_domain_points_to_self() {
     if [[ "$pub_ip" != 'N/A' ]] && ! grep -Fxq "$pub_ip" <<< "$resolved"; then
         msg "${YELLOW}[!] 域名已解析，但未发现解析到当前公网 IP: $pub_ip${NC}"
         msg "${YELLOW}解析结果:${NC}\n$resolved"
-        read -r -ep '仍然继续？[y/N]: ' continue_domain
+        read -r -ep '仍然继续？[Y/N]: ' continue_domain
         is_yes "$continue_domain" || die '已取消部署。'
     fi
 }
@@ -1175,9 +1175,9 @@ pre_install_setup() {
         fi
 
         if [[ "${AIO_LANG:-zh}" == 'en' ]]; then
-            read -r -ep '   [HY2] Enable port hopping? [y/N]: ' INPUT_H_HOP
+            read -r -ep '   [HY2] Enable port hopping? [Y/N]: ' INPUT_H_HOP
         else
-            read -r -ep '   [HY2] 是否开启端口跳跃 (单端口被限速环境建议开启)? [y/N]: ' INPUT_H_HOP
+            read -r -ep '   [HY2] 是否开启端口跳跃 (单端口被限速环境建议开启)? [Y/N]: ' INPUT_H_HOP
         fi
         if is_yes "$INPUT_H_HOP"; then
             HY2_HOP='true'
@@ -1250,9 +1250,9 @@ pre_install_setup() {
     fi
 
     if [[ "${AIO_LANG:-zh}" == 'en' ]]; then
-        read -r -ep '   [Global] Enable TCP KeepAlive 45s to prevent NAT idle disconnect? [y/N]: ' INPUT_KA
+        read -r -ep '   [Global] Enable TCP KeepAlive 45s to prevent NAT idle disconnect? [Y/N]: ' INPUT_KA
     else
-        read -r -ep '   [全局] 是否开启 TCP KeepAlive (45s) 防治 NAT 空闲断连? [y/N]: ' INPUT_KA
+        read -r -ep '   [全局] 是否开启 TCP KeepAlive (45s) 防治 NAT 空闲断连? [Y/N]: ' INPUT_KA
     fi
     is_yes "$INPUT_KA" && ENABLE_KEEPALIVE='true' || ENABLE_KEEPALIVE='false'
     msg "${CYAN}======================================================================${NC}\n"
@@ -2028,7 +2028,7 @@ check_virgin_state() {
     clear
     init_system_environment
     msg "${YELLOW}删除全部节点与环境初始化 / Delete all nodes and perform environment initialization${NC}"
-    read -r -ep '确定执行环境深度自愈吗？[y/N]: ' confirm_virgin
+    read -r -ep '确定执行环境深度自愈吗？[Y/N]: ' confirm_virgin
     is_yes "$confirm_virgin" || { msg "${GREEN}操作已取消。${NC}"; pause_return; return; }
     stop_all_managed_services
     killall -TERM xray sing-box hysteria 2>/dev/null || true
