@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ==============================A-BOX===============================
+# ==============================A-Box===============================
 set -o pipefail
 export DEBIAN_FRONTEND=noninteractive
 export LANG=${LANG:-en_US.UTF-8}
@@ -14,10 +14,10 @@ NC='\033[0m'
 BOLD='\033[1m'
 
 DEPS_MARKER='/etc/ddr/.deps.v20260504'
-SCRIPT_URL='https://raw.githubusercontent.com/alariclin/A-BOX/main/install.sh'
+SCRIPT_URL='https://raw.githubusercontent.com/alariclin/a-box/main/install.sh'
 ABOX_DIR='/etc/ddr'
 ABOX_ENV='/etc/ddr/.env'
-LOCK_FILE='/var/run/A-BOX.lock'
+LOCK_FILE='/var/run/A-Box.lock'
 LANG_FILE='/etc/ddr/.lang'
 PUBLIC_IP_CACHE='/etc/ddr/.public_ip.cache'
 PUBLIC_IP_CACHE_TTL=600
@@ -51,18 +51,18 @@ tr_msg() {
         en:yes_no_default_no) echo '[Y/N]' ;;
         zh:yes_no_default_yes) echo '[Y/N]' ;;
         en:yes_no_default_yes) echo '[Y/N]' ;;
-        zh:reality_sni_prompt) echo '   [%s] 请输入伪装 SNI (端口 %s，回车默认: %s): ' ;;
-        en:reality_sni_prompt) echo '   [%s] Enter camouflage SNI (port %s, default: %s): ' ;;
+        zh:reality_sni_prompt) echo '   %s 请输入伪装 SNI (端口 %s，回车默认: %s): ' ;;
+        en:reality_sni_prompt) echo '   %s Enter camouflage SNI (port %s, default: %s): ' ;;
         zh:bad_sni) echo 'SNI 格式非法: %s' ;;
         en:bad_sni) echo 'Invalid SNI format: %s' ;;
         zh:apple_non443_warn) echo '检测到非 443 端口使用 Apple/iCloud 类 SNI：%s。Xray-core 对 apple/icloud target 与非443端口有风险警告，此组合可能提高 IP 封禁概率。' ;;
         en:apple_non443_warn) echo 'Apple/iCloud-like SNI on non-443 port detected: %s. Xray-core warns about apple/icloud targets and non-443 listening ports; this combination may increase IP blocking risk.' ;;
         zh:continue_or_reset) echo '继续使用此 SNI？输入 y 继续，其他任意键重新输入 %s: ' ;;
         en:continue_or_reset) echo 'Continue with this SNI? Type y to continue, anything else to re-enter %s: ' ;;
-        zh:port_prompt) echo '   [%s] 请输入监听端口 (回车默认: %s): ' ;;
-        en:port_prompt) echo '   [%s] Enter listen port (default: %s): ' ;;
-        zh:ss_port_prompt) echo '   [SS-2022] 请输入回程监听端口(TCP/UDP) (回车默认: %s): ' ;;
-        en:ss_port_prompt) echo '   [SS-2022] Enter relay listen port (TCP/UDP, default: %s): ' ;;
+        zh:port_prompt) echo '   %s 请输入监听端口 (回车默认: %s): ' ;;
+        en:port_prompt) echo '   %s Enter listen port (default: %s): ' ;;
+        zh:ss_port_prompt) echo '   %s 请输入回程监听端口(TCP/UDP) (回车默认: %s): ' ;;
+        en:ss_port_prompt) echo '   %s Enter relay listen port (TCP/UDP, default: %s): ' ;;
         zh:bad_port) echo '端口非法: %s' ;;
         en:bad_port) echo 'Invalid port: %s' ;;
         zh:toolbox_title) echo '综合工具箱 / Toolbox' ;;
@@ -78,6 +78,10 @@ tr_msg() {
 }
 
 tprintf() { local key="$1"; shift; printf "$(tr_msg "$key")" "$@"; }
+
+proto_label() {
+    printf '%b[%s]%b' "${BOLD}${CYAN}" "$1" "${NC}"
+}
 
 pause_return() { read -r -ep "$(tr_msg press_return)" _ || true; }
 
@@ -222,6 +226,34 @@ valid_url_https() {
     valid_domain "$host" || return 1
 }
 
+normalize_https_url_input() {
+    local input="${1:-}" rest
+    input="$(printf '%s' "$input" | tr -d '\r' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
+    [[ -n "$input" ]] || return 1
+    if [[ "$input" != http://* && "$input" != https://* ]]; then
+        input="https://${input}"
+    fi
+    if [[ "$input" == https://* ]]; then
+        rest="${input#https://}"
+        [[ "$rest" != */* ]] && input="${input}/"
+    fi
+    printf '%s\n' "$input"
+}
+
+prompt_https_url() {
+    local prompt="$1" default_url="$2" input normalized
+    while true; do
+        read -r -ep "$prompt" input
+        input="${input:-$default_url}"
+        normalized="$(normalize_https_url_input "$input" 2>/dev/null || true)"
+        if [[ -n "$normalized" ]] && valid_url_https "$normalized"; then
+            printf '%s\n' "$normalized"
+            return 0
+        fi
+        msg "${RED}[!] HY2 伪装 URL 非法 / Invalid HY2 masquerade URL: ${input}${NC}"
+        msg "${YELLOW}    正确示例 / Example: https://www.microsoft.com/${NC}"
+    done
+}
 valid_ipv4_cidr() {
     local input="${1:-}" addr mask n
     addr="${input%/*}"
@@ -628,26 +660,26 @@ save_firewall_rules() {
 allowPort() {
     local port=$1 type=${2:-tcp}
     if ! $IPT -w -C INPUT -p "$type" --dport "$port" -j ACCEPT 2>/dev/null; then
-        $IPT -w -I INPUT -p "$type" --dport "$port" -m comment --comment "A-BOX-${port}-${type}" -j ACCEPT >/dev/null 2>&1 || die "IPv4 防火墙放行失败: ${port}/${type}"
+        $IPT -w -I INPUT -p "$type" --dport "$port" -m comment --comment "A-Box-${port}-${type}" -j ACCEPT >/dev/null 2>&1 || die "IPv4 防火墙放行失败: ${port}/${type}"
     fi
     if has_ipv6 && command -v ip6tables >/dev/null 2>&1 && $IPT6 -w -S INPUT >/dev/null 2>&1; then
         if ! $IPT6 -w -C INPUT -p "$type" --dport "$port" -j ACCEPT 2>/dev/null; then
-            $IPT6 -w -I INPUT -p "$type" --dport "$port" -m comment --comment "A-BOX-${port}-${type}" -j ACCEPT >/dev/null 2>&1 || die "IPv6 防火墙放行失败: ${port}/${type}"
+            $IPT6 -w -I INPUT -p "$type" --dport "$port" -m comment --comment "A-Box-${port}-${type}" -j ACCEPT >/dev/null 2>&1 || die "IPv6 防火墙放行失败: ${port}/${type}"
         fi
     fi
 }
 
 clean_nat_rules() {
     local rule
-    while $IPT -w -t nat -S PREROUTING 2>/dev/null | grep -q 'A-BOX-HY2-HOP'; do
-        rule=$($IPT -w -t nat -S PREROUTING 2>/dev/null | grep 'A-BOX-HY2-HOP' | head -n 1 | sed 's/^-A /-D /')
+    while $IPT -w -t nat -S PREROUTING 2>/dev/null | grep -q 'A-Box-HY2-HOP'; do
+        rule=$($IPT -w -t nat -S PREROUTING 2>/dev/null | grep 'A-Box-HY2-HOP' | head -n 1 | sed 's/^-A /-D /')
         [[ -z "$rule" ]] && break
         # shellcheck disable=SC2086
         $IPT -w -t nat $rule 2>/dev/null || break
     done
     if command -v ip6tables >/dev/null 2>&1 && $IPT6 -w -t nat -S PREROUTING >/dev/null 2>&1; then
-        while $IPT6 -w -t nat -S PREROUTING 2>/dev/null | grep -q 'A-BOX-HY2-HOP'; do
-            rule=$($IPT6 -w -t nat -S PREROUTING 2>/dev/null | grep 'A-BOX-HY2-HOP' | head -n 1 | sed 's/^-A /-D /')
+        while $IPT6 -w -t nat -S PREROUTING 2>/dev/null | grep -q 'A-Box-HY2-HOP'; do
+            rule=$($IPT6 -w -t nat -S PREROUTING 2>/dev/null | grep 'A-Box-HY2-HOP' | head -n 1 | sed 's/^-A /-D /')
             [[ -z "$rule" ]] && break
             # shellcheck disable=SC2086
             $IPT6 -w -t nat $rule 2>/dev/null || break
@@ -657,15 +689,15 @@ clean_nat_rules() {
 
 clean_input_rules() {
     local rule
-    while $IPT -w -S INPUT 2>/dev/null | grep -q 'A-BOX-'; do
-        rule=$($IPT -w -S INPUT 2>/dev/null | grep 'A-BOX-' | head -n 1 | sed 's/^-A /-D /')
+    while $IPT -w -S INPUT 2>/dev/null | grep -q 'A-Box-'; do
+        rule=$($IPT -w -S INPUT 2>/dev/null | grep 'A-Box-' | head -n 1 | sed 's/^-A /-D /')
         [[ -z "$rule" ]] && break
         # shellcheck disable=SC2086
         $IPT -w $rule 2>/dev/null || break
     done
     if command -v ip6tables >/dev/null 2>&1 && $IPT6 -w -S INPUT >/dev/null 2>&1; then
-        while $IPT6 -w -S INPUT 2>/dev/null | grep -q 'A-BOX-'; do
-            rule=$($IPT6 -w -S INPUT 2>/dev/null | grep 'A-BOX-' | head -n 1 | sed 's/^-A /-D /')
+        while $IPT6 -w -S INPUT 2>/dev/null | grep -q 'A-Box-'; do
+            rule=$($IPT6 -w -S INPUT 2>/dev/null | grep 'A-Box-' | head -n 1 | sed 's/^-A /-D /')
             [[ -z "$rule" ]] && break
             # shellcheck disable=SC2086
             $IPT6 -w $rule 2>/dev/null || break
@@ -690,7 +722,7 @@ selected_port_pairs() {
 }
 
 check_selected_ports_free() {
-    msg "${YELLOW}[*] 正在检查新选择端口是否被非 A-BOX 进程占用...${NC}"
+    msg "${YELLOW}[*] 正在检查新选择端口是否被非 A-Box 进程占用...${NC}"
     local pairs pair proto p holder dup
     pairs=$(selected_port_pairs | awk 'NF')
     dup=$(printf '%s\n' "$pairs" | awk 'NF{seen[$0]++} END{for(k in seen) if(seen[k]>1) print k}' | head -n 1)
@@ -709,7 +741,7 @@ check_selected_ports_free() {
         proto=${pair%/*}; p=${pair#*/}
         holder=$(ss -H -n -l -p -A "$proto" 2>/dev/null | grep -E "[:.]${p}\b" | grep -vE 'xray|sing-box|hysteria' || true)
         [[ -z "$holder" ]] && continue
-        msg "${RED}[!] 新选择端口 ${p}/${proto} 已被非 A-BOX 进程占用：${NC}"
+        msg "${RED}[!] 新选择端口 ${p}/${proto} 已被非 A-Box 进程占用：${NC}"
         echo "$holder"
         die "请先手动释放端口 ${p}/${proto}。"
     done
@@ -723,7 +755,7 @@ check_selected_ports_free() {
             fi
         done | grep -vE 'xray|sing-box|hysteria' || true)
         if [[ -n "$holder" ]]; then
-            msg "${RED}[!] HY2 UDP 跳跃区间 ${HY2_RANGE_START}-${HY2_RANGE_END} 已被非 A-BOX 进程占用：${NC}"
+            msg "${RED}[!] HY2 UDP 跳跃区间 ${HY2_RANGE_START}-${HY2_RANGE_END} 已被非 A-Box 进程占用：${NC}"
             echo "$holder"
             die '请先手动释放 HY2 UDP 跳跃区间内的占用端口。'
         fi
@@ -731,7 +763,7 @@ check_selected_ports_free() {
 }
 
 release_ports() {
-    msg "${YELLOW}[*] 正在停止 A-BOX 托管服务并检查端口占用...${NC}"
+    msg "${YELLOW}[*] 正在停止 A-Box 托管服务并检查端口占用...${NC}"
     stop_all_managed_services
     sleep 1
     local pairs pair proto p holder
@@ -740,7 +772,7 @@ release_ports() {
         proto=${pair%/*}; p=${pair#*/}
         holder=$(ss -H -n -l -p -A "$proto" 2>/dev/null | grep -E "[:.]${p}\b" | grep -vE 'xray|sing-box|hysteria' || true)
         [[ -z "$holder" ]] && continue
-        msg "${RED}[!] 端口 ${p}/${proto} 已被非 A-BOX 进程占用：${NC}"
+        msg "${RED}[!] 端口 ${p}/${proto} 已被非 A-Box 进程占用：${NC}"
         echo "$holder"
         die "请先手动释放端口 ${p}/${proto}。脚本不会自动 kill 非托管进程。"
     done
@@ -758,38 +790,43 @@ write_if_changed() {
 setup_shortcut() {
     mkdir -p "$ABOX_DIR"
     if [[ "${1:-}" == 'update' ]]; then
-        curl -fLs --connect-timeout 10 "$SCRIPT_URL" -o /tmp/A-BOX.sh.tmp || die '快捷入口脚本下载失败。'
-        bash -n /tmp/A-BOX.sh.tmp || die '更新脚本语法校验失败。'
-        grep -q '==============================A-BOX===============================' /tmp/A-BOX.sh.tmp || die '更新脚本文本指纹不匹配。'
-        write_if_changed "$ABOX_DIR/A-BOX.sh" /tmp/A-BOX.sh.tmp
+        curl -fLs --connect-timeout 10 "$SCRIPT_URL" -o /tmp/A-Box.sh.tmp || die '快捷入口脚本下载失败。'
+        bash -n /tmp/A-Box.sh.tmp || die '更新脚本语法校验失败。'
+        grep -q '==============================A-Box===============================' /tmp/A-Box.sh.tmp || die '更新脚本文本指纹不匹配。'
+        write_if_changed "$ABOX_DIR/A-Box.sh" /tmp/A-Box.sh.tmp
     elif [[ -f "$0" && -r "$0" && "$0" != 'bash' && "$0" != '-bash' ]]; then
-        if [[ ! -f "$ABOX_DIR/A-BOX.sh" ]] || ! cmp -s "$0" "$ABOX_DIR/A-BOX.sh"; then
-            cp -f "$0" "$ABOX_DIR/A-BOX.sh"
+        if [[ ! -f "$ABOX_DIR/A-Box.sh" ]] || ! cmp -s "$0" "$ABOX_DIR/A-Box.sh"; then
+            cp -f "$0" "$ABOX_DIR/A-Box.sh"
         fi
-    elif [[ ! -f "$ABOX_DIR/A-BOX.sh" ]]; then
-        curl -fLs --connect-timeout 10 "$SCRIPT_URL" -o /tmp/A-BOX.sh.tmp || die '无法从远端创建持久化入口。'
-        bash -n /tmp/A-BOX.sh.tmp || die '持久化脚本语法校验失败。'
-        grep -q '==============================A-BOX===============================' /tmp/A-BOX.sh.tmp || die '持久化脚本文本指纹不匹配。'
-        write_if_changed "$ABOX_DIR/A-BOX.sh" /tmp/A-BOX.sh.tmp
+    elif [[ ! -f "$ABOX_DIR/A-Box.sh" ]]; then
+        curl -fLs --connect-timeout 10 "$SCRIPT_URL" -o /tmp/A-Box.sh.tmp || die '无法从远端创建持久化入口。'
+        bash -n /tmp/A-Box.sh.tmp || die '持久化脚本语法校验失败。'
+        grep -q '==============================A-Box===============================' /tmp/A-Box.sh.tmp || die '持久化脚本文本指纹不匹配。'
+        write_if_changed "$ABOX_DIR/A-Box.sh" /tmp/A-Box.sh.tmp
     fi
-    chmod +x "$ABOX_DIR/A-BOX.sh"
+    chmod +x "$ABOX_DIR/A-Box.sh"
 
     local shortcut_tmp
-    shortcut_tmp=$(mktemp /tmp/A-BOX-sb.XXXXXX) || die '快捷入口临时文件创建失败。'
+    shortcut_tmp=$(mktemp /tmp/A-Box-sb.XXXXXX) || die '快捷入口临时文件创建失败。'
     cat > "$shortcut_tmp" <<'EOS'
 #!/usr/bin/env bash
 if [[ $EUID -eq 0 ]]; then
-    exec bash /etc/ddr/A-BOX.sh "$@"
+    exec bash /etc/ddr/A-Box.sh "$@"
 elif command -v sudo >/dev/null 2>&1; then
-    exec sudo bash /etc/ddr/A-BOX.sh "$@"
+    exec sudo bash /etc/ddr/A-Box.sh "$@"
 else
     echo 'Root privileges required. Please run: su -'
     exit 1
 fi
 EOS
-    chmod +x "$shortcut_tmp"
-    write_if_changed /usr/local/bin/sb "$shortcut_tmp"
-    chmod +x /usr/local/bin/sb
+    chmod 755 "$shortcut_tmp"
+    if [[ ! -f /usr/local/bin/sb ]] || ! cmp -s "$shortcut_tmp" /usr/local/bin/sb; then
+        install -m 755 "$shortcut_tmp" /usr/local/bin/sb || die '快捷入口写入失败。'
+        rm -f "$shortcut_tmp"
+    else
+        rm -f "$shortcut_tmp"
+        chmod 755 /usr/local/bin/sb 2>/dev/null || true
+    fi
 }
 validate_downloaded_asset() {
     local f="/tmp/$1"
@@ -934,10 +971,10 @@ write_env() {
 
 setup_active_defense() {
     msg "${YELLOW}[*] 正在挂载环形缓冲日志与 Fail2Ban 主动防御矩阵...${NC}"
-    touch /var/log/A-BOX-xray-access.log /var/log/A-BOX-xray-error.log /var/log/A-BOX-singbox.log 2>/dev/null || true
-    chmod 644 /var/log/A-BOX-*.log 2>/dev/null || true
-    cat > /etc/logrotate.d/A-BOX <<'EOF_LOGROTATE'
-/var/log/A-BOX-*.log {
+    touch /var/log/A-Box-xray-access.log /var/log/A-Box-xray-error.log /var/log/A-Box-singbox.log 2>/dev/null || true
+    chmod 644 /var/log/A-Box-*.log 2>/dev/null || true
+    cat > /etc/logrotate.d/A-Box <<'EOF_LOGROTATE'
+/var/log/A-Box-*.log {
     su root root
     daily
     rotate 2
@@ -950,23 +987,23 @@ setup_active_defense() {
 EOF_LOGROTATE
     if command -v fail2ban-client >/dev/null 2>&1; then
         mkdir -p /etc/fail2ban/filter.d /etc/fail2ban/jail.d
-        cat > /etc/fail2ban/filter.d/A-BOX.conf <<'EOF_F2B_FILTER'
+        cat > /etc/fail2ban/filter.d/A-Box.conf <<'EOF_F2B_FILTER'
 [Definition]
 failregex = ^.*(?:rejected|invalid request|bad request|authentication failed).* from <HOST>[: ].*$
             ^.*<HOST>.*(?:rejected|invalid|unauthorized|forbidden).*$
 ignoreregex =
 EOF_F2B_FILTER
-        cat > /etc/fail2ban/jail.d/A-BOX.local <<'EOF_F2B_JAIL'
-[A-BOX]
+        cat > /etc/fail2ban/jail.d/A-Box.local <<'EOF_F2B_JAIL'
+[A-Box]
 enabled = true
 port = 1-65535
-filter = A-BOX
-logpath = /var/log/A-BOX-xray-error.log
-          /var/log/A-BOX-singbox.log
+filter = A-Box
+logpath = /var/log/A-Box-xray-error.log
+          /var/log/A-Box-singbox.log
 maxretry = 8
 findtime = 120
 bantime = 3600
-action = iptables-allports[name=A-BOX]
+action = iptables-allports[name=A-Box]
 EOF_F2B_JAIL
         if [[ "$INIT_SYS" == 'systemd' ]]; then
             systemctl restart fail2ban 2>/dev/null || true
@@ -1039,12 +1076,12 @@ HY2_SRV="$CORE"
 [[ "$CORE" == 'xray' && "$MODE" == *'ALL'* ]] && HY2_SRV='hysteria'
 
 if [[ "${HY2_HOP:-}" == 'true' && "${HY2_HOP_IMPL:-}" == 'manual' && -n "${HY2_RANGE_START:-}" && -n "${HY2_RANGE_END:-}" ]]; then
-    if ! $IPT -w -t nat -S PREROUTING 2>/dev/null | grep -q 'A-BOX-HY2-HOP'; then
+    if ! $IPT -w -t nat -S PREROUTING 2>/dev/null | grep -q 'A-Box-HY2-HOP'; then
         check_restart "$HY2_SRV"
         exit 0
     fi
     if has_ipv6 && ipv6_nat_redirect_usable; then
-        if ! $IPT6 -w -t nat -S PREROUTING 2>/dev/null | grep -q 'A-BOX-HY2-HOP'; then
+        if ! $IPT6 -w -t nat -S PREROUTING 2>/dev/null | grep -q 'A-Box-HY2-HOP'; then
             check_restart "$HY2_SRV"
             exit 0
         fi
@@ -1095,7 +1132,7 @@ targets=0
 [[ -d '/etc/sing-box' ]] && targets=$((targets + 1))
 (( targets == 0 )) && exit 0
 
-tmpdir=$(mktemp -d /tmp/A-BOX-geo.XXXXXX) || exit 1
+tmpdir=$(mktemp -d /tmp/A-Box-geo.XXXXXX) || exit 1
 trap 'rm -rf "$tmpdir"' EXIT
 fetch_one "$GEOIP_URL" "$tmpdir/geoip.dat" || exit 1
 fetch_one "$GEOSITE_URL" "$tmpdir/geosite.dat" || exit 1
@@ -1125,9 +1162,20 @@ pre_install_setup() {
     reset_protocol_vars
     local DEF_V_PORT=443 DEF_X_PORT=8443 DEF_H_PORT=443 DEF_S_PORT=2053
     local INPUT_V_PORT INPUT_X_PORT INPUT_H_PORT INPUT_H_DOMAIN INPUT_H_HOP INPUT_H_DOWN INPUT_H_UP INPUT_H_MASQ INPUT_S_PORT INPUT_SS_WL INPUT_KA ip prompt
+    local HAS_VISION=false HAS_XHTTP=false HAS_HY2=false HAS_SS=false
+    local L_VISION L_XHTTP L_HY2 L_SS L_GLOBAL
+    L_VISION=$(proto_label 'VLESS-Vision')
+    L_XHTTP=$(proto_label 'VLESS-XHTTP')
+    L_HY2=$(proto_label 'HY2')
+    L_SS=$(proto_label 'SS-2022')
+    if [[ "${ABOX_LANG:-zh}" == 'en' ]]; then L_GLOBAL=$(proto_label 'Global'); else L_GLOBAL=$(proto_label '全局'); fi
+    [[ "$MODE_IN" == *'VISION'* || "$MODE_IN" == *'ALL'* || "$MODE_IN" == 'VLESS_SS' ]] && HAS_VISION=true
+    [[ "$CORE_IN" == 'xray' && ( "$MODE_IN" == *'XHTTP'* || "$MODE_IN" == *'ALL'* ) ]] && HAS_XHTTP=true
+    [[ "$MODE_IN" == *'HY2'* || "$MODE_IN" == *'ALL'* ]] && HAS_HY2=true
+    [[ "$MODE_IN" == *'SS'* || "$MODE_IN" == *'ALL'* || "$MODE_IN" == 'VLESS_SS' ]] && HAS_SS=true
 
-    # Xray ALL: TCP 443 for VLESS-Vision, TCP 8443 for VLESS-XHTTP, UDP 443 for HY2.
-    # TCP/UDP can share the same numeric port; SS-2022 listens on TCP/UDP 2053 by default.
+    # Xray ALL: Vision TCP 443 + XHTTP TCP 8443 + HY2 UDP 443 + SS-2022 TCP/UDP 2053.
+    # Sing-box ALL: Vision TCP 443 + HY2 UDP 443 + SS-2022 TCP/UDP 2053. XHTTP is intentionally excluded.
 
     INGRESS_IF=$(get_active_interface)
     [[ -z "$INGRESS_IF" ]] && die '无法识别公网入接口。'
@@ -1141,32 +1189,32 @@ pre_install_setup() {
     fi
     msg "${BLUE}----------------------------------------------------------------------${NC}"
 
-    if [[ "$MODE_IN" == *'VISION'* || "$MODE_IN" == *'ALL'* || "$MODE_IN" == 'VLESS_SS' ]]; then
-        printf -v prompt "$(tr_msg port_prompt)" 'VLESS-Vision' "$DEF_V_PORT"
+    if [[ "$HAS_VISION" == 'true' ]]; then
+        printf -v prompt "$(tr_msg port_prompt)" "$L_VISION" "$DEF_V_PORT"
         read -r -ep "$prompt" INPUT_V_PORT
         VLESS_PORT=${INPUT_V_PORT:-$DEF_V_PORT}
         valid_port "$VLESS_PORT" || die "$(printf "$(tr_msg bad_port)" "$VLESS_PORT")"
-        VISION_SNI=$(prompt_reality_sni 'VLESS-Vision' "$VLESS_PORT")
+        VISION_SNI=$(prompt_reality_sni "$L_VISION" "$VLESS_PORT")
     fi
-    if [[ "$MODE_IN" == *'XHTTP'* || "$MODE_IN" == *'ALL'* ]]; then
-        printf -v prompt "$(tr_msg port_prompt)" 'VLESS-XHTTP' "$DEF_X_PORT"
+    if [[ "$HAS_XHTTP" == 'true' ]]; then
+        printf -v prompt "$(tr_msg port_prompt)" "$L_XHTTP" "$DEF_X_PORT"
         read -r -ep "$prompt" INPUT_X_PORT
         XHTTP_PORT=${INPUT_X_PORT:-$DEF_X_PORT}
         valid_port "$XHTTP_PORT" || die "$(printf "$(tr_msg bad_port)" "$XHTTP_PORT")"
-        XHTTP_SNI=$(prompt_reality_sni 'VLESS-XHTTP' "$XHTTP_PORT")
+        XHTTP_SNI=$(prompt_reality_sni "$L_XHTTP" "$XHTTP_PORT")
     fi
     VLESS_SNI=${VISION_SNI:-${XHTTP_SNI:-www.microsoft.com}}
 
-    if [[ "$MODE_IN" == *'HY2'* || "$MODE_IN" == *'ALL'* ]]; then
-        printf -v prompt "$(tr_msg port_prompt)" 'HY2' "$DEF_H_PORT"
+    if [[ "$HAS_HY2" == 'true' ]]; then
+        printf -v prompt "$(tr_msg port_prompt)" "$L_HY2" "$DEF_H_PORT"
         read -r -ep "$prompt" INPUT_H_PORT
         HY2_BASE_PORT=${INPUT_H_PORT:-$DEF_H_PORT}
         valid_port "$HY2_BASE_PORT" || die "$(printf "$(tr_msg bad_port)" "$HY2_BASE_PORT")"
 
         if [[ "${ABOX_LANG:-zh}" == 'en' ]]; then
-            read -r -ep '   [HY2] Do you have a domain already resolved to this server? (empty = self-signed certificate): ' INPUT_H_DOMAIN
+            read -r -ep "   ${L_HY2} Do you have a domain already resolved to this server? (empty = self-signed certificate): " INPUT_H_DOMAIN
         else
-            read -r -ep '   [HY2] 是否拥有已解析到本机的域名？(留空使用默认自签证书): ' INPUT_H_DOMAIN
+            read -r -ep "   ${L_HY2} 是否拥有已解析到本机的域名？(留空使用默认自签证书): " INPUT_H_DOMAIN
         fi
         HY2_DOMAIN="$INPUT_H_DOMAIN"
         if [[ -n "$HY2_DOMAIN" ]]; then
@@ -1175,9 +1223,9 @@ pre_install_setup() {
         fi
 
         if [[ "${ABOX_LANG:-zh}" == 'en' ]]; then
-            read -r -ep '   [HY2] Enable port hopping? [Y/N]: ' INPUT_H_HOP
+            read -r -ep "   ${L_HY2} Enable port hopping? [Y/N]: " INPUT_H_HOP
         else
-            read -r -ep '   [HY2] 是否开启端口跳跃 (单端口被限速环境建议开启)? [Y/N]: ' INPUT_H_HOP
+            read -r -ep "   ${L_HY2} 是否开启端口跳跃 (单端口被限速环境建议开启)? [Y/N]: " INPUT_H_HOP
         fi
         if is_yes "$INPUT_H_HOP"; then
             HY2_HOP='true'
@@ -1204,38 +1252,36 @@ pre_install_setup() {
         fi
 
         if [[ "${ABOX_LANG:-zh}" == 'en' ]]; then
-            read -r -ep '   [HY2] Downlink Mbps (default: 1000): ' INPUT_H_DOWN
+            read -r -ep "   ${L_HY2} Downlink Mbps (default: 1000): " INPUT_H_DOWN
         else
-            read -r -ep '   [HY2] 下行速率(Mbps) (回车默认: 1000): ' INPUT_H_DOWN
+            read -r -ep "   ${L_HY2} 下行速率(Mbps) (回车默认: 1000): " INPUT_H_DOWN
         fi
         HY2_DOWN=${INPUT_H_DOWN:-1000}
         valid_positive_int "$HY2_DOWN" || die "速率非法 / Invalid rate: $HY2_DOWN"
         if [[ "${ABOX_LANG:-zh}" == 'en' ]]; then
-            read -r -ep '   [HY2] Uplink Mbps (default: 100): ' INPUT_H_UP
+            read -r -ep "   ${L_HY2} Uplink Mbps (default: 100): " INPUT_H_UP
         else
-            read -r -ep '   [HY2] 上行速率(Mbps) (回车默认: 100): ' INPUT_H_UP
+            read -r -ep "   ${L_HY2} 上行速率(Mbps) (回车默认: 100): " INPUT_H_UP
         fi
         HY2_UP=${INPUT_H_UP:-100}
         valid_positive_int "$HY2_UP" || die "速率非法 / Invalid rate: $HY2_UP"
 
         local masq_default="https://${VISION_SNI:-${XHTTP_SNI:-www.samsung.com}}/"
         if [[ "${ABOX_LANG:-zh}" == 'en' ]]; then
-            read -r -ep "   [HY2] Enter HTTP/3 masquerade URL (default: $masq_default): " INPUT_H_MASQ
+            HY2_MASQ_URL=$(prompt_https_url "   ${L_HY2} Enter HTTP/3 masquerade URL (default: $masq_default): " "$masq_default")
         else
-            read -r -ep "   [HY2] 请输入 HTTP/3 伪装站点 URL (回车默认: $masq_default): " INPUT_H_MASQ
+            HY2_MASQ_URL=$(prompt_https_url "   ${L_HY2} 请输入 HTTP/3 伪装站点 URL (回车默认: $masq_default): " "$masq_default")
         fi
-        HY2_MASQ_URL=${INPUT_H_MASQ:-$masq_default}
-        valid_url_https "$HY2_MASQ_URL" || die "HY2 伪装 URL 非法 / Invalid HY2 masquerade URL: $HY2_MASQ_URL"
     fi
-    if [[ "$MODE_IN" == *'SS'* || "$MODE_IN" == *'ALL'* || "$MODE_IN" == 'VLESS_SS' ]]; then
-        printf -v prompt "$(tr_msg ss_port_prompt)" "$DEF_S_PORT"
+    if [[ "$HAS_SS" == 'true' ]]; then
+        printf -v prompt "$(tr_msg ss_port_prompt)" "$L_SS" "$DEF_S_PORT"
         read -r -ep "$prompt" INPUT_S_PORT
         SS_PORT=${INPUT_S_PORT:-$DEF_S_PORT}
         valid_port "$SS_PORT" || die "$(printf "$(tr_msg bad_port)" "$SS_PORT")"
         if [[ "${ABOX_LANG:-zh}" == 'en' ]]; then
-            read -r -ep '   [SS-2022] Enter frontend whitelist IP/CIDR (empty = open to all, space-separated): ' INPUT_SS_WL
+            read -r -ep "   ${L_SS} Enter frontend whitelist IP/CIDR (empty = open to all, space-separated): " INPUT_SS_WL
         else
-            read -r -ep '   [SS-2022] 请输入前置机白名单 IP/CIDR (留空全网开放, 多个用空格分隔): ' INPUT_SS_WL
+            read -r -ep "   ${L_SS} 请输入前置机白名单 IP/CIDR (留空全网开放, 多个用空格分隔): " INPUT_SS_WL
         fi
         SS_WHITELIST_IP="$INPUT_SS_WL"
         if [[ -n "$SS_WHITELIST_IP" ]]; then
@@ -1250,18 +1296,18 @@ pre_install_setup() {
     fi
 
     if [[ "${ABOX_LANG:-zh}" == 'en' ]]; then
-        read -r -ep '   [Global] Enable TCP KeepAlive 45s to prevent NAT idle disconnect? [Y/N]: ' INPUT_KA
+        read -r -ep "   ${L_GLOBAL} Enable TCP KeepAlive 45s to prevent NAT idle disconnect? [Y/N]: " INPUT_KA
     else
-        read -r -ep '   [全局] 是否开启 TCP KeepAlive (45s) 防治 NAT 空闲断连? [Y/N]: ' INPUT_KA
+        read -r -ep "   ${L_GLOBAL} 是否开启 TCP KeepAlive (45s) 防治 NAT 空闲断连? [Y/N]: " INPUT_KA
     fi
     is_yes "$INPUT_KA" && ENABLE_KEEPALIVE='true' || ENABLE_KEEPALIVE='false'
     msg "${CYAN}======================================================================${NC}\n"
 
     check_selected_ports_free
 
-    [[ "$MODE_IN" == *'VISION'* || "$MODE_IN" == *'ALL'* || "$MODE_IN" == 'VLESS_SS' ]] && allowPort "$VLESS_PORT" tcp
-    [[ "$MODE_IN" == *'XHTTP'* || "$MODE_IN" == *'ALL'* ]] && allowPort "$XHTTP_PORT" tcp
-    if [[ "$MODE_IN" == *'HY2'* || "$MODE_IN" == *'ALL'* ]]; then
+    [[ "$HAS_VISION" == 'true' ]] && allowPort "$VLESS_PORT" tcp
+    [[ "$HAS_XHTTP" == 'true' ]] && allowPort "$XHTTP_PORT" tcp
+    if [[ "$HAS_HY2" == 'true' ]]; then
         if [[ -n "$HY2_DOMAIN" && ( "$CORE_IN" == 'hysteria' || "$MODE_IN" == *'ALL'* ) ]]; then
             allowPort 80 tcp
         fi
@@ -1272,30 +1318,30 @@ pre_install_setup() {
             allowPort "$HY2_BASE_PORT" udp
         fi
     fi
-    if [[ "$MODE_IN" == *'SS'* || "$MODE_IN" == *'ALL'* || "$MODE_IN" == 'VLESS_SS' ]]; then
+    if [[ "$HAS_SS" == 'true' ]]; then
         if [[ -n "${SS_WHITELIST_IP:-}" ]]; then
             for ip in $SS_WHITELIST_IP; do
                 for proto in tcp udp; do
                     if [[ "$ip" == *:* ]]; then
                         if has_ipv6 && command -v ip6tables >/dev/null 2>&1 && $IPT6 -w -S INPUT >/dev/null 2>&1; then
                             if ! $IPT6 -w -C INPUT -p "$proto" --dport "$SS_PORT" -s "$ip" -j ACCEPT 2>/dev/null; then
-                                $IPT6 -w -I INPUT -p "$proto" --dport "$SS_PORT" -s "$ip" -m comment --comment "A-BOX-${SS_PORT}-${proto}-WL6" -j ACCEPT >/dev/null 2>&1 || die "IPv6 白名单规则写入失败: $ip/$proto"
+                                $IPT6 -w -I INPUT -p "$proto" --dport "$SS_PORT" -s "$ip" -m comment --comment "A-Box-${SS_PORT}-${proto}-WL6" -j ACCEPT >/dev/null 2>&1 || die "IPv6 白名单规则写入失败: $ip/$proto"
                             fi
                         fi
                     else
                         if ! $IPT -w -C INPUT -p "$proto" --dport "$SS_PORT" -s "$ip" -j ACCEPT 2>/dev/null; then
-                            $IPT -w -I INPUT -p "$proto" --dport "$SS_PORT" -s "$ip" -m comment --comment "A-BOX-${SS_PORT}-${proto}-WL" -j ACCEPT >/dev/null 2>&1 || die "IPv4 白名单规则写入失败: $ip/$proto"
+                            $IPT -w -I INPUT -p "$proto" --dport "$SS_PORT" -s "$ip" -m comment --comment "A-Box-${SS_PORT}-${proto}-WL" -j ACCEPT >/dev/null 2>&1 || die "IPv4 白名单规则写入失败: $ip/$proto"
                         fi
                     fi
                 done
             done
             for proto in tcp udp; do
                 if ! $IPT -w -C INPUT -p "$proto" --dport "$SS_PORT" -j DROP 2>/dev/null; then
-                    $IPT -w -A INPUT -p "$proto" --dport "$SS_PORT" -m comment --comment "A-BOX-${SS_PORT}-${proto}-DROP" -j DROP >/dev/null 2>&1 || die "IPv4 SS DROP 规则写入失败: $proto"
+                    $IPT -w -A INPUT -p "$proto" --dport "$SS_PORT" -m comment --comment "A-Box-${SS_PORT}-${proto}-DROP" -j DROP >/dev/null 2>&1 || die "IPv4 SS DROP 规则写入失败: $proto"
                 fi
                 if has_ipv6 && command -v ip6tables >/dev/null 2>&1 && $IPT6 -w -S INPUT >/dev/null 2>&1; then
                     if ! $IPT6 -w -C INPUT -p "$proto" --dport "$SS_PORT" -j DROP 2>/dev/null; then
-                        $IPT6 -w -A INPUT -p "$proto" --dport "$SS_PORT" -m comment --comment "A-BOX-${SS_PORT}-${proto}-DROP6" -j DROP >/dev/null 2>&1 || die "IPv6 SS DROP 规则写入失败: $proto"
+                        $IPT6 -w -A INPUT -p "$proto" --dport "$SS_PORT" -m comment --comment "A-Box-${SS_PORT}-${proto}-DROP6" -j DROP >/dev/null 2>&1 || die "IPv6 SS DROP 规则写入失败: $proto"
                     fi
                 fi
             done
@@ -1357,7 +1403,7 @@ build_xray_config() {
     tmp_out="${out}.tmp.$$"
     mkdir -p "$(dirname "$out")"
     jq -n --argjson inbounds "$inbounds_json" '{
-        log:{loglevel:"warning", access:"/var/log/A-BOX-xray-access.log", error:"/var/log/A-BOX-xray-error.log"},
+        log:{loglevel:"warning", access:"/var/log/A-Box-xray-access.log", error:"/var/log/A-Box-xray-error.log"},
         routing:{domainStrategy:"IPIfNonMatch", rules:[
             {type:"field", protocol:["bittorrent"], outboundTag:"block"},
             {type:"field", domain:["geosite:category-ads-all"], outboundTag:"block"}
@@ -1422,7 +1468,7 @@ build_singbox_config() {
     tmp_out="${out}.tmp.$$"
     mkdir -p "$(dirname "$out")"
     jq -n --argjson inbounds "$inbounds_json" '{
-        log:{level:"warn", output:"/var/log/A-BOX-singbox.log"},
+        log:{level:"warn", output:"/var/log/A-Box-singbox.log"},
         route:{rules:[{protocol:"bittorrent", outbound:"block"}], auto_detect_interface:true},
         inbounds:$inbounds,
         outbounds:[{type:"direct", tag:"direct"}, {type:"block", tag:"block"}]
@@ -1677,25 +1723,25 @@ deploy_singbox() {
     /usr/local/bin/sing-box check -c /etc/sing-box/config.json >/dev/null 2>&1 || die 'Sing-box 配置校验失败。'
 
     if [[ "$MODE_IN" == *'HY2'* || "$MODE_IN" == *'ALL'* ]] && [[ "${HY2_HOP:-}" == 'true' ]]; then
-        SB_PRE_START="ExecStartPre=-/bin/sh -c '$IPT -w -t nat -D PREROUTING -i $INGRESS_IF -p udp --dport ${HY2_RANGE_START}:${HY2_RANGE_END} -m comment --comment \"A-BOX-HY2-HOP\" -j REDIRECT --to-ports $HY2_BASE_PORT 2>/dev/null || true'
-ExecStartPre=-/bin/sh -c '$IPT -w -t nat -A PREROUTING -i $INGRESS_IF -p udp --dport ${HY2_RANGE_START}:${HY2_RANGE_END} -m comment --comment \"A-BOX-HY2-HOP\" -j REDIRECT --to-ports $HY2_BASE_PORT 2>/dev/null || true'"
-        SB_POST_STOP="ExecStopPost=-/bin/sh -c '$IPT -w -t nat -D PREROUTING -i $INGRESS_IF -p udp --dport ${HY2_RANGE_START}:${HY2_RANGE_END} -m comment --comment \"A-BOX-HY2-HOP\" -j REDIRECT --to-ports $HY2_BASE_PORT 2>/dev/null || true'"
+        SB_PRE_START="ExecStartPre=-/bin/sh -c '$IPT -w -t nat -D PREROUTING -i $INGRESS_IF -p udp --dport ${HY2_RANGE_START}:${HY2_RANGE_END} -m comment --comment \"A-Box-HY2-HOP\" -j REDIRECT --to-ports $HY2_BASE_PORT 2>/dev/null || true'
+ExecStartPre=-/bin/sh -c '$IPT -w -t nat -A PREROUTING -i $INGRESS_IF -p udp --dport ${HY2_RANGE_START}:${HY2_RANGE_END} -m comment --comment \"A-Box-HY2-HOP\" -j REDIRECT --to-ports $HY2_BASE_PORT 2>/dev/null || true'"
+        SB_POST_STOP="ExecStopPost=-/bin/sh -c '$IPT -w -t nat -D PREROUTING -i $INGRESS_IF -p udp --dport ${HY2_RANGE_START}:${HY2_RANGE_END} -m comment --comment \"A-Box-HY2-HOP\" -j REDIRECT --to-ports $HY2_BASE_PORT 2>/dev/null || true'"
         SB_RC_PRE="start_pre() {
-  $IPT -w -t nat -D PREROUTING -i $INGRESS_IF -p udp --dport ${HY2_RANGE_START}:${HY2_RANGE_END} -m comment --comment \"A-BOX-HY2-HOP\" -j REDIRECT --to-ports $HY2_BASE_PORT 2>/dev/null || true
-  $IPT -w -t nat -A PREROUTING -i $INGRESS_IF -p udp --dport ${HY2_RANGE_START}:${HY2_RANGE_END} -m comment --comment \"A-BOX-HY2-HOP\" -j REDIRECT --to-ports $HY2_BASE_PORT 2>/dev/null || true"
+  $IPT -w -t nat -D PREROUTING -i $INGRESS_IF -p udp --dport ${HY2_RANGE_START}:${HY2_RANGE_END} -m comment --comment \"A-Box-HY2-HOP\" -j REDIRECT --to-ports $HY2_BASE_PORT 2>/dev/null || true
+  $IPT -w -t nat -A PREROUTING -i $INGRESS_IF -p udp --dport ${HY2_RANGE_START}:${HY2_RANGE_END} -m comment --comment \"A-Box-HY2-HOP\" -j REDIRECT --to-ports $HY2_BASE_PORT 2>/dev/null || true"
         SB_RC_POST="stop_post() {
-  $IPT -w -t nat -D PREROUTING -i $INGRESS_IF -p udp --dport ${HY2_RANGE_START}:${HY2_RANGE_END} -m comment --comment \"A-BOX-HY2-HOP\" -j REDIRECT --to-ports $HY2_BASE_PORT 2>/dev/null || true"
+  $IPT -w -t nat -D PREROUTING -i $INGRESS_IF -p udp --dport ${HY2_RANGE_START}:${HY2_RANGE_END} -m comment --comment \"A-Box-HY2-HOP\" -j REDIRECT --to-ports $HY2_BASE_PORT 2>/dev/null || true"
         if has_ipv6 && ipv6_nat_redirect_usable; then
             SB_PRE_START+="
-ExecStartPre=-/bin/sh -c '$IPT6 -w -t nat -D PREROUTING -i $INGRESS_IF -p udp --dport ${HY2_RANGE_START}:${HY2_RANGE_END} -m comment --comment \"A-BOX-HY2-HOP\" -j REDIRECT --to-ports $HY2_BASE_PORT 2>/dev/null || true'
-ExecStartPre=-/bin/sh -c '$IPT6 -w -t nat -A PREROUTING -i $INGRESS_IF -p udp --dport ${HY2_RANGE_START}:${HY2_RANGE_END} -m comment --comment \"A-BOX-HY2-HOP\" -j REDIRECT --to-ports $HY2_BASE_PORT 2>/dev/null || true'"
+ExecStartPre=-/bin/sh -c '$IPT6 -w -t nat -D PREROUTING -i $INGRESS_IF -p udp --dport ${HY2_RANGE_START}:${HY2_RANGE_END} -m comment --comment \"A-Box-HY2-HOP\" -j REDIRECT --to-ports $HY2_BASE_PORT 2>/dev/null || true'
+ExecStartPre=-/bin/sh -c '$IPT6 -w -t nat -A PREROUTING -i $INGRESS_IF -p udp --dport ${HY2_RANGE_START}:${HY2_RANGE_END} -m comment --comment \"A-Box-HY2-HOP\" -j REDIRECT --to-ports $HY2_BASE_PORT 2>/dev/null || true'"
             SB_POST_STOP+="
-ExecStopPost=-/bin/sh -c '$IPT6 -w -t nat -D PREROUTING -i $INGRESS_IF -p udp --dport ${HY2_RANGE_START}:${HY2_RANGE_END} -m comment --comment \"A-BOX-HY2-HOP\" -j REDIRECT --to-ports $HY2_BASE_PORT 2>/dev/null || true'"
+ExecStopPost=-/bin/sh -c '$IPT6 -w -t nat -D PREROUTING -i $INGRESS_IF -p udp --dport ${HY2_RANGE_START}:${HY2_RANGE_END} -m comment --comment \"A-Box-HY2-HOP\" -j REDIRECT --to-ports $HY2_BASE_PORT 2>/dev/null || true'"
             SB_RC_PRE+="
-  $IPT6 -w -t nat -D PREROUTING -i $INGRESS_IF -p udp --dport ${HY2_RANGE_START}:${HY2_RANGE_END} -m comment --comment \"A-BOX-HY2-HOP\" -j REDIRECT --to-ports $HY2_BASE_PORT 2>/dev/null || true
-  $IPT6 -w -t nat -A PREROUTING -i $INGRESS_IF -p udp --dport ${HY2_RANGE_START}:${HY2_RANGE_END} -m comment --comment \"A-BOX-HY2-HOP\" -j REDIRECT --to-ports $HY2_BASE_PORT 2>/dev/null || true"
+  $IPT6 -w -t nat -D PREROUTING -i $INGRESS_IF -p udp --dport ${HY2_RANGE_START}:${HY2_RANGE_END} -m comment --comment \"A-Box-HY2-HOP\" -j REDIRECT --to-ports $HY2_BASE_PORT 2>/dev/null || true
+  $IPT6 -w -t nat -A PREROUTING -i $INGRESS_IF -p udp --dport ${HY2_RANGE_START}:${HY2_RANGE_END} -m comment --comment \"A-Box-HY2-HOP\" -j REDIRECT --to-ports $HY2_BASE_PORT 2>/dev/null || true"
             SB_RC_POST+="
-  $IPT6 -w -t nat -D PREROUTING -i $INGRESS_IF -p udp --dport ${HY2_RANGE_START}:${HY2_RANGE_END} -m comment --comment \"A-BOX-HY2-HOP\" -j REDIRECT --to-ports $HY2_BASE_PORT 2>/dev/null || true"
+  $IPT6 -w -t nat -D PREROUTING -i $INGRESS_IF -p udp --dport ${HY2_RANGE_START}:${HY2_RANGE_END} -m comment --comment \"A-Box-HY2-HOP\" -j REDIRECT --to-ports $HY2_BASE_PORT 2>/dev/null || true"
         fi
         SB_RC_PRE+="
   return 0
@@ -1901,12 +1947,12 @@ manage_ss_whitelist() {
                 valid_ipv6_cidr "$add_ip" || { msg "${RED}[!] IPv6 白名单地址非法: $add_ip${NC}"; pause_return; return; }
                 has_ipv6 && command -v ip6tables >/dev/null 2>&1 && $IPT6 -w -S INPUT >/dev/null 2>&1 || die '系统无可用 IPv6 防火墙。'
                 for proto in tcp udp; do
-                    $IPT6 -w -I INPUT -p "$proto" --dport "$SS_PORT" -s "$add_ip" -m comment --comment "A-BOX-${SS_PORT}-${proto}-WL6" -j ACCEPT >/dev/null 2>&1 || die "IPv6 白名单规则写入失败: $add_ip/$proto"
+                    $IPT6 -w -I INPUT -p "$proto" --dport "$SS_PORT" -s "$add_ip" -m comment --comment "A-Box-${SS_PORT}-${proto}-WL6" -j ACCEPT >/dev/null 2>&1 || die "IPv6 白名单规则写入失败: $add_ip/$proto"
                 done
             else
                 valid_ipv4_cidr "$add_ip" || { msg "${RED}[!] IPv4 白名单地址非法: $add_ip${NC}"; pause_return; return; }
                 for proto in tcp udp; do
-                    $IPT -w -I INPUT -p "$proto" --dport "$SS_PORT" -s "$add_ip" -m comment --comment "A-BOX-${SS_PORT}-${proto}-WL" -j ACCEPT >/dev/null 2>&1 || die "IPv4 白名单规则写入失败: $add_ip/$proto"
+                    $IPT -w -I INPUT -p "$proto" --dport "$SS_PORT" -s "$add_ip" -m comment --comment "A-Box-${SS_PORT}-${proto}-WL" -j ACCEPT >/dev/null 2>&1 || die "IPv4 白名单规则写入失败: $add_ip/$proto"
                 done
             fi
             save_firewall_rules
@@ -1920,8 +1966,8 @@ manage_ss_whitelist() {
             if [[ "$del_ip" == *:* ]]; then
                 valid_ipv6_cidr "$del_ip" || { msg "${RED}[!] IPv6 白名单地址非法: $del_ip${NC}"; pause_return; return; }
                 for proto in tcp udp; do
-                    while $IPT6 -w -S INPUT 2>/dev/null | grep -F "A-BOX-${SS_PORT}-${proto}-WL6" | grep -Fq -- "$del_ip"; do
-                        rule=$($IPT6 -w -S INPUT 2>/dev/null | grep -F "A-BOX-${SS_PORT}-${proto}-WL6" | grep -F -- "$del_ip" | head -n 1 | sed 's/^-A /-D /')
+                    while $IPT6 -w -S INPUT 2>/dev/null | grep -F "A-Box-${SS_PORT}-${proto}-WL6" | grep -Fq -- "$del_ip"; do
+                        rule=$($IPT6 -w -S INPUT 2>/dev/null | grep -F "A-Box-${SS_PORT}-${proto}-WL6" | grep -F -- "$del_ip" | head -n 1 | sed 's/^-A /-D /')
                         [[ -z "$rule" ]] && break
                         # shellcheck disable=SC2086
                         $IPT6 -w $rule >/dev/null 2>&1 || die "IPv6 白名单规则删除失败: $del_ip/$proto"
@@ -1931,8 +1977,8 @@ manage_ss_whitelist() {
             else
                 valid_ipv4_cidr "$del_ip" || { msg "${RED}[!] IPv4 白名单地址非法: $del_ip${NC}"; pause_return; return; }
                 for proto in tcp udp; do
-                    while $IPT -w -S INPUT 2>/dev/null | grep -F "A-BOX-${SS_PORT}-${proto}-WL" | grep -Fq -- "$del_ip"; do
-                        rule=$($IPT -w -S INPUT 2>/dev/null | grep -F "A-BOX-${SS_PORT}-${proto}-WL" | grep -F -- "$del_ip" | head -n 1 | sed 's/^-A /-D /')
+                    while $IPT -w -S INPUT 2>/dev/null | grep -F "A-Box-${SS_PORT}-${proto}-WL" | grep -Fq -- "$del_ip"; do
+                        rule=$($IPT -w -S INPUT 2>/dev/null | grep -F "A-Box-${SS_PORT}-${proto}-WL" | grep -F -- "$del_ip" | head -n 1 | sed 's/^-A /-D /')
                         [[ -z "$rule" ]] && break
                         # shellcheck disable=SC2086
                         $IPT -w $rule >/dev/null 2>&1 || die "IPv4 白名单规则删除失败: $del_ip/$proto"
@@ -1947,11 +1993,11 @@ manage_ss_whitelist() {
         3)
             for proto in tcp udp; do
                 if ! $IPT -w -C INPUT -p "$proto" --dport "$SS_PORT" -j DROP 2>/dev/null; then
-                    $IPT -w -A INPUT -p "$proto" --dport "$SS_PORT" -m comment --comment "A-BOX-${SS_PORT}-${proto}-DROP" -j DROP >/dev/null 2>&1 || die "IPv4 SS DROP 规则写入失败: $proto"
+                    $IPT -w -A INPUT -p "$proto" --dport "$SS_PORT" -m comment --comment "A-Box-${SS_PORT}-${proto}-DROP" -j DROP >/dev/null 2>&1 || die "IPv4 SS DROP 规则写入失败: $proto"
                 fi
                 if has_ipv6 && command -v ip6tables >/dev/null 2>&1 && $IPT6 -w -S INPUT >/dev/null 2>&1; then
                     if ! $IPT6 -w -C INPUT -p "$proto" --dport "$SS_PORT" -j DROP 2>/dev/null; then
-                        $IPT6 -w -A INPUT -p "$proto" --dport "$SS_PORT" -m comment --comment "A-BOX-${SS_PORT}-${proto}-DROP6" -j DROP >/dev/null 2>&1 || die "IPv6 SS DROP 规则写入失败: $proto"
+                        $IPT6 -w -A INPUT -p "$proto" --dport "$SS_PORT" -m comment --comment "A-Box-${SS_PORT}-${proto}-DROP6" -j DROP >/dev/null 2>&1 || die "IPv6 SS DROP 规则写入失败: $proto"
                     fi
                 fi
             done
@@ -1961,15 +2007,15 @@ manage_ss_whitelist() {
             ;;
         4)
             for proto in tcp udp; do
-                while $IPT -w -S INPUT 2>/dev/null | grep -q "A-BOX-${SS_PORT}-${proto}-DROP"; do
-                    rule=$($IPT -w -S INPUT 2>/dev/null | grep "A-BOX-${SS_PORT}-${proto}-DROP" | head -n 1 | sed 's/^-A /-D /')
+                while $IPT -w -S INPUT 2>/dev/null | grep -q "A-Box-${SS_PORT}-${proto}-DROP"; do
+                    rule=$($IPT -w -S INPUT 2>/dev/null | grep "A-Box-${SS_PORT}-${proto}-DROP" | head -n 1 | sed 's/^-A /-D /')
                     [[ -z "$rule" ]] && break
                     # shellcheck disable=SC2086
                     $IPT -w $rule >/dev/null 2>&1 || break
                 done
                 if command -v ip6tables >/dev/null 2>&1 && $IPT6 -w -S INPUT >/dev/null 2>&1; then
-                    while $IPT6 -w -S INPUT 2>/dev/null | grep -q "A-BOX-${SS_PORT}-${proto}-DROP6"; do
-                        rule=$($IPT6 -w -S INPUT 2>/dev/null | grep "A-BOX-${SS_PORT}-${proto}-DROP6" | head -n 1 | sed 's/^-A /-D /')
+                    while $IPT6 -w -S INPUT 2>/dev/null | grep -q "A-Box-${SS_PORT}-${proto}-DROP6"; do
+                        rule=$($IPT6 -w -S INPUT 2>/dev/null | grep "A-Box-${SS_PORT}-${proto}-DROP6" | head -n 1 | sed 's/^-A /-D /')
                         [[ -z "$rule" ]] && break
                         # shellcheck disable=SC2086
                         $IPT6 -w $rule >/dev/null 2>&1 || break
@@ -1998,14 +2044,14 @@ do_cleanup() {
     rm -rf /usr/local/etc/xray /usr/local/share/xray /etc/sing-box /etc/hysteria /usr/local/bin/xray /usr/local/bin/sing-box /usr/local/bin/hysteria
     rm -f /etc/systemd/system/xray.service /etc/systemd/system/sing-box.service /etc/systemd/system/hysteria.service
     rm -f /etc/init.d/xray /etc/init.d/sing-box /etc/init.d/hysteria
-    rm -f /etc/sysctl.d/99-A-BOX-tune.conf /etc/security/limits.d/A-BOX.conf
+    rm -f /etc/sysctl.d/99-A-Box-tune.conf /etc/security/limits.d/A-Box.conf
     sysctl --system >/dev/null 2>&1 || true
     local tmp_cron
     tmp_cron=$(mktemp)
     crontab -l 2>/dev/null | grep -vE '^no crontab for|^#' | grep -vE '/etc/ddr/traffic_monitor.sh|/etc/ddr/geo_update.sh|/etc/ddr/socket_probe.sh' > "$tmp_cron" || true
     crontab "$tmp_cron" 2>/dev/null || true
     rm -f "$tmp_cron"
-    rm -f /var/log/A-BOX-*.log /etc/fail2ban/jail.d/A-BOX.local /etc/fail2ban/filter.d/A-BOX.conf /etc/logrotate.d/A-BOX 2>/dev/null || true
+    rm -f /var/log/A-Box-*.log /etc/fail2ban/jail.d/A-Box.local /etc/fail2ban/filter.d/A-Box.conf /etc/logrotate.d/A-Box 2>/dev/null || true
     if [[ "$INIT_SYS" == 'systemd' ]]; then
         systemctl restart fail2ban 2>/dev/null || true
         systemctl daemon-reload 2>/dev/null || true
@@ -2045,7 +2091,7 @@ check_virgin_state() {
     rm -f "$ABOX_ENV" "$ABOX_DIR"/.deps* "$ABOX_DIR/traffic_monitor.sh" "$ABOX_DIR/geo_update.sh" "$ABOX_DIR/socket_probe.sh"
     rm -rf /usr/local/etc/xray /usr/local/share/xray /etc/sing-box /etc/hysteria /usr/local/bin/xray /usr/local/bin/sing-box /usr/local/bin/hysteria
     rm -f /etc/systemd/system/xray.service /etc/systemd/system/sing-box.service /etc/systemd/system/hysteria.service /etc/init.d/xray /etc/init.d/sing-box /etc/init.d/hysteria
-    rm -f /var/log/A-BOX-*.log /etc/fail2ban/jail.d/A-BOX.local /etc/fail2ban/filter.d/A-BOX.conf /etc/logrotate.d/A-BOX 2>/dev/null || true
+    rm -f /var/log/A-Box-*.log /etc/fail2ban/jail.d/A-Box.local /etc/fail2ban/filter.d/A-Box.conf /etc/logrotate.d/A-Box 2>/dev/null || true
     [[ "$INIT_SYS" == 'systemd' ]] && systemctl daemon-reload 2>/dev/null || true
     msg "${GREEN}环境初始化完成。${NC}"
     pause_return
@@ -2053,7 +2099,7 @@ check_virgin_state() {
 
 tune_vps() {
     clear; msg "${CYAN}正在开启底层系统优化 (TCP-BBR & I/O Limit Control)...${NC}"
-    cat > /etc/security/limits.d/A-BOX.conf <<'EOF_LIMITS'
+    cat > /etc/security/limits.d/A-Box.conf <<'EOF_LIMITS'
 * soft nofile 1048576
 * hard nofile 1048576
 * soft nproc 1048576
@@ -2062,7 +2108,7 @@ root soft nofile 1048576
 root hard nofile 1048576
 EOF_LIMITS
     modprobe tcp_bbr 2>/dev/null || true
-    cat > /etc/sysctl.d/99-A-BOX-tune.conf <<'EOF_SYSCTL'
+    cat > /etc/sysctl.d/99-A-Box-tune.conf <<'EOF_SYSCTL'
 fs.file-max = 1048576
 fs.inotify.max_user_instances = 8192
 net.ipv4.ip_forward = 1
@@ -2222,22 +2268,22 @@ view_config() {
     msg "${BLUE}----------------------------------------------------------------------${NC}"
     msg "${YELLOW}[ 通用分享 URI / General URIs ]${NC}"
     if [[ "$MODE" == *'VISION'* || "$MODE" == *'ALL'* || "$MODE" == 'VLESS_SS' ]]; then
-        VLESS_URL="vless://$UUID@$F_IP:$VLESS_PORT?encryption=none&flow=xtls-rprx-vision&security=reality&sni=$VISION_SNI&fp=chrome&pbk=$PUBLIC_KEY&sid=$SHORT_ID&type=tcp#A-BOX-VLESS-Vision"
+        VLESS_URL="vless://$UUID@$F_IP:$VLESS_PORT?encryption=none&flow=xtls-rprx-vision&security=reality&sni=$VISION_SNI&fp=chrome&pbk=$PUBLIC_KEY&sid=$SHORT_ID&type=tcp#A-Box-VLESS-Vision"
         msg "${GREEN}${VLESS_URL}${NC}"
         generate_qr "$VLESS_URL"
     fi
     if [[ "$CORE" == 'xray' && ( "$MODE" == *'XHTTP'* || "$MODE" == *'ALL'* ) ]]; then
-        XHTTP_URL="vless://$UUID@$F_IP:$XHTTP_PORT?encryption=none&security=reality&sni=$XHTTP_SNI&fp=chrome&pbk=$PUBLIC_KEY&sid=$SHORT_ID&type=xhttp&path=%2Fxhttp&mode=stream-one#A-BOX-VLESS-XHTTP"
+        XHTTP_URL="vless://$UUID@$F_IP:$XHTTP_PORT?encryption=none&security=reality&sni=$XHTTP_SNI&fp=chrome&pbk=$PUBLIC_KEY&sid=$SHORT_ID&type=xhttp&path=%2Fxhttp&mode=stream-one#A-Box-VLESS-XHTTP"
         msg "${GREEN}${XHTTP_URL}${NC}"
         generate_qr "$XHTTP_URL"
     fi
     if [[ "$MODE" == *'HY2'* || "$MODE" == *'ALL'* ]]; then
         if [[ -n "${HY2_DOMAIN:-}" && "$CORE" != 'singbox' ]]; then
-            HY2_URL="hysteria2://$HY2_PASS@$HY2_DOMAIN:$HY2_URI_PORTS/?sni=$HY2_DOMAIN&obfs=salamander&obfs-password=$HY2_OBFS#A-BOX-Hy2-ACME"
+            HY2_URL="hysteria2://$HY2_PASS@$HY2_DOMAIN:$HY2_URI_PORTS/?sni=$HY2_DOMAIN&obfs=salamander&obfs-password=$HY2_OBFS#A-Box-Hy2-ACME"
         else
             S_IP="$F_IP"
             [[ -n "${HY2_DOMAIN:-}" ]] && S_IP="$HY2_DOMAIN"
-            HY2_URL="hysteria2://$HY2_PASS@$S_IP:$HY2_URI_PORTS/?insecure=1&pinSHA256=$HY2_CERT_SHA256_FP&obfs=salamander&obfs-password=$HY2_OBFS#A-BOX-Hy2-Self"
+            HY2_URL="hysteria2://$HY2_PASS@$S_IP:$HY2_URI_PORTS/?insecure=1&pinSHA256=$HY2_CERT_SHA256_FP&obfs=salamander&obfs-password=$HY2_OBFS#A-Box-Hy2-Self"
         fi
         msg "${GREEN}${HY2_URL}${NC}"
         [[ "${HY2_HOP:-}" == 'true' ]] && msg "${YELLOW}端口跳跃默认间隔 30s；不建议低于 5s。${NC}"
@@ -2245,7 +2291,7 @@ view_config() {
     fi
     if [[ "$MODE" == *'SS'* || "$MODE" == *'ALL'* || "$MODE" == 'VLESS_SS' ]]; then
         SS_BASE64=$(printf '%s' "2022-blake3-aes-128-gcm:${SS_PASS}" | base64 -w 0 2>/dev/null || printf '%s' "2022-blake3-aes-128-gcm:${SS_PASS}" | base64 | tr -d '\n')
-        SS_URL="ss://${SS_BASE64}@$F_IP:$SS_PORT#A-BOX-SS"
+        SS_URL="ss://${SS_BASE64}@$F_IP:$SS_PORT#A-Box-SS"
         msg "${GREEN}${SS_URL}${NC}"
         generate_qr "$SS_URL"
     fi
@@ -2255,7 +2301,7 @@ view_config() {
     msg "${YELLOW}[ Clash Meta / Mihomo 示例 ]${NC}"
     if [[ "$MODE" == *'VISION'* || "$MODE" == *'ALL'* || "$MODE" == 'VLESS_SS' ]]; then
         cat <<EOF_CM
-  - name: "A-BOX-VLESS-Vision"
+  - name: "A-Box-VLESS-Vision"
     type: vless
     server: $LINK_IP
     port: $VLESS_PORT
@@ -2277,7 +2323,7 @@ EOF_CM
     fi
     if [[ "$CORE" == 'xray' && ( "$MODE" == *'XHTTP'* || "$MODE" == *'ALL'* ) ]]; then
         cat <<EOF_CM
-  - name: "A-BOX-VLESS-XHTTP"
+  - name: "A-Box-VLESS-XHTTP"
     type: vless
     server: $LINK_IP
     port: $XHTTP_PORT
@@ -2306,7 +2352,7 @@ EOF_CM
         if [[ -n "${HY2_DOMAIN:-}" && "$CORE" != 'singbox' ]]; then
             if [[ "${HY2_HOP:-}" == 'true' ]]; then
                 cat <<EOF_CM
-  - name: "A-BOX-Hy2-ACME"
+  - name: "A-Box-Hy2-ACME"
     type: hysteria2
     server: $HY2_DOMAIN
     ports: ${HY2_CLASH_PORTS}
@@ -2319,7 +2365,7 @@ EOF_CM
 EOF_CM
             else
                 cat <<EOF_CM
-  - name: "A-BOX-Hy2-ACME"
+  - name: "A-Box-Hy2-ACME"
     type: hysteria2
     server: $HY2_DOMAIN
     port: $HY2_BASE_PORT
@@ -2333,7 +2379,7 @@ EOF_CM
         else
             if [[ "${HY2_HOP:-}" == 'true' ]]; then
                 cat <<EOF_CM
-  - name: "A-BOX-Hy2-Self"
+  - name: "A-Box-Hy2-Self"
     type: hysteria2
     server: $S_IP
     ports: ${HY2_CLASH_PORTS}
@@ -2347,7 +2393,7 @@ EOF_CM
 EOF_CM
             else
                 cat <<EOF_CM
-  - name: "A-BOX-Hy2-Self"
+  - name: "A-Box-Hy2-Self"
     type: hysteria2
     server: $S_IP
     port: $HY2_BASE_PORT
@@ -2363,7 +2409,7 @@ EOF_CM
     fi
     if [[ "$MODE" == *'SS'* || "$MODE" == *'ALL'* || "$MODE" == 'VLESS_SS' ]]; then
         cat <<EOF_CM
-  - name: "A-BOX-SS"
+  - name: "A-Box-SS"
     type: ss
     server: $LINK_IP
     port: $SS_PORT
@@ -2434,7 +2480,7 @@ EOF_SB
         cat <<EOF_V2N
 {
   "v": "2",
-  "ps": "A-BOX-VLESS-XHTTP",
+  "ps": "A-Box-VLESS-XHTTP",
   "add": "$LINK_IP",
   "port": "$XHTTP_PORT",
   "id": "$UUID",
@@ -2458,7 +2504,7 @@ EOF_V2N
 show_usage() {
     clear
     msg "${CYAN}======================================================================${NC}"
-    msg "${BOLD}${GREEN}A-BOX 脚本全功能说明书 / Full Manual${NC}"
+    msg "${BOLD}${GREEN}A-Box 脚本全功能说明书 / Full Manual${NC}"
     msg "${CYAN}======================================================================${NC}"
     if [[ "${ABOX_LANG:-zh}" == 'en' ]]; then
         cat <<'EOF_USAGE'
@@ -2494,7 +2540,7 @@ show_usage() {
 14 Manual
    This page.
 15 OTA & Geo Update
-   Update A-BOX script and Loyalsoldier geoip/geosite data.
+   Update A-Box script and Loyalsoldier geoip/geosite data.
 16 Full/Partial Uninstall
    Remove proxy stack, firewall rules, services and optional sb shortcut.
 17 Environment Reset
@@ -2540,7 +2586,7 @@ EOF_USAGE
 14 脚本说明书
    当前页面。
 15 脚本 OTA 升级与 Geo 资源更新
-   更新 A-BOX 主脚本和 Loyalsoldier geoip/geosite 数据。
+   更新 A-Box 主脚本和 Loyalsoldier geoip/geosite 数据。
 16 一键全部清空卸载
    删除代理栈、服务、防火墙规则，可选择是否保留 sb 快捷入口。
 17 删除全部节点与环境初始化
@@ -2559,15 +2605,15 @@ EOF_USAGE
 
 update_script() {
     clear
-    local OTA_URL='https://raw.githubusercontent.com/alariclin/A-BOX/main/install.sh'
+    local OTA_URL='https://raw.githubusercontent.com/alariclin/a-box/main/install.sh'
     msg "${YELLOW}[*] 正在同步远端源码...${NC}"
-    if curl -fLs --connect-timeout 10 "$OTA_URL" -o /tmp/A-BOX_update.sh; then
-        if bash -n /tmp/A-BOX_update.sh && grep -q '==============================A-BOX===============================' /tmp/A-BOX_update.sh; then
-            mv /tmp/A-BOX_update.sh "$ABOX_DIR/A-BOX.sh"
-            chmod +x "$ABOX_DIR/A-BOX.sh"
+    if curl -fLs --connect-timeout 10 "$OTA_URL" -o /tmp/A-Box_update.sh; then
+        if bash -n /tmp/A-Box_update.sh && grep -q '==============================A-Box===============================' /tmp/A-Box_update.sh; then
+            mv /tmp/A-Box_update.sh "$ABOX_DIR/A-Box.sh"
+            chmod +x "$ABOX_DIR/A-Box.sh"
             msg "${GREEN}核心代码热更新完毕。${NC}"
             sleep 2
-            exec "$ABOX_DIR/A-BOX.sh"
+            exec "$ABOX_DIR/A-Box.sh"
         else
             msg "${RED}[!] 更新脚本语法错误或指纹校验失败。${NC}"
         fi
@@ -2594,7 +2640,7 @@ ota_and_geo_menu() {
     msg "${CYAN}======================================================================${NC}"
     msg "${BOLD}${GREEN}脚本 OTA 升级与 Geo 资源更新${NC}"
     msg "${CYAN}======================================================================${NC}"
-    msg "${YELLOW}1. 升级 A-BOX 核心脚本${NC}"
+    msg "${YELLOW}1. 升级 A-Box 核心脚本${NC}"
     msg "${YELLOW}2. 立即拉取并更新 Loyalsoldier Geo 资源${NC}"
     msg "${GREEN}0. 返回主菜单${NC}"
     read -r -ep '请选择 [0-2]: ' ota_choice
@@ -2619,25 +2665,25 @@ enter_runtime() {
     initial_language_select
     exec 9>"$LOCK_FILE"
     if command -v flock >/dev/null 2>&1; then
-        flock -n 9 || die '检测到另一个 A-BOX 实例正在运行。'
+        flock -n 9 || die '检测到另一个 A-Box 实例正在运行。'
     fi
 }
 
 show_cli_help() {
     cat <<'EOF_HELP'
-A-BOX
+A-Box
 Usage:
-  bash A-BOX.sh                    启动交互菜单 / Start interactive menu
-  bash A-BOX.sh --lang zh          设置中文并启动 / Use Chinese UI
-  bash A-BOX.sh --lang en          Use English UI / 设置英文并启动
-  bash A-BOX.sh --self-test        运行无副作用静态自测 / Run static self-test
-  bash A-BOX.sh --help             显示命令行帮助 / Show help
+  bash A-Box.sh                    启动交互菜单 / Start interactive menu
+  bash A-Box.sh --lang zh          设置中文并启动 / Use Chinese UI
+  bash A-Box.sh --lang en          Use English UI / 设置英文并启动
+  bash A-Box.sh --self-test        运行无副作用静态自测 / Run static self-test
+  bash A-Box.sh --help             显示命令行帮助 / Show help
 EOF_HELP
 }
 
 run_self_tests() {
     local tmp failures=0
-    tmp=$(mktemp -d /tmp/A-BOX-selftest.XXXXXX) || exit 1
+    tmp=$(mktemp -d /tmp/A-Box-selftest.XXXXXX) || exit 1
     trap 'rm -rf "$tmp"' RETURN
     assert_ok() { "$@" >/dev/null 2>&1 || { echo "FAIL: $*"; failures=$((failures + 1)); }; }
     assert_bad() { "$@" >/dev/null 2>&1 && { echo "FAIL expected bad: $*"; failures=$((failures + 1)); } || true; }
@@ -2656,6 +2702,7 @@ run_self_tests() {
     assert_ok valid_url_https https://example.com:443/path
     assert_bad valid_url_https http://example.com/
     assert_bad valid_url_https 'https://bad example.com/'
+    [[ "$(normalize_https_url_input www.microsoft.com)" == 'https://www.microsoft.com/' ]] || { echo 'FAIL: normalize HTTPS URL'; failures=$((failures + 1)); }
     assert_ok valid_ipv4_cidr 192.0.2.1/24
     assert_bad valid_ipv4_cidr 999.0.2.1/24
     assert_ok valid_ipv6_cidr 2001:db8::1/64
@@ -2689,6 +2736,7 @@ run_self_tests() {
     SINGBOX_CONFIG_PATH="$tmp/sing-box/config.json" build_singbox_config ALL
     jq empty "$tmp/sing-box/config.json" >/dev/null 2>&1 || { echo 'FAIL: build_singbox_config JSON'; failures=$((failures + 1)); }
     jq -e '.inbounds[] | select(.type=="shadowsocks" and .listen_port==2053 and (.network|not))' "$tmp/sing-box/config.json" >/dev/null 2>&1 || { echo 'FAIL: Sing-box SS-2022 2053 default network'; failures=$((failures + 1)); }
+    jq -e 'all(.inbounds[]; .type != "xhttp")' "$tmp/sing-box/config.json" >/dev/null 2>&1 || { echo 'FAIL: Sing-box ALL must not include XHTTP'; failures=$((failures + 1)); }
 
     if (( failures > 0 )); then
         echo "SELF_TEST_FAILED=$failures"
@@ -2731,7 +2779,7 @@ main_loop() {
         source "$ABOX_ENV" 2>/dev/null && CUR_MODE="[${CORE}-${MODE}]" || CUR_MODE=''
         clear
         msg "${BLUE}======================================================================${NC}"
-        msg "${BOLD}${YELLOW}==============================A-BOX===============================${NC}"
+        msg "${BOLD}${YELLOW}==============================A-Box===============================${NC}"
         msg "${BLUE}======================================================================${NC}"
         if [[ "${ABOX_LANG:-zh}" == 'en' ]]; then
             msg "Gateway: ${YELLOW}$GLOBAL_PUBLIC_IP${NC} | Core: $STATUS_STR $CUR_MODE"
