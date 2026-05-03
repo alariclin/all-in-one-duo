@@ -916,14 +916,14 @@ pre_install_setup() {
         HY2_BASE_PORT=${INPUT_H_PORT:-$DEF_H_PORT}
         valid_port "$HY2_BASE_PORT" || die "端口非法: $HY2_BASE_PORT"
 
-        read -r -ep '   [HY2] 是否拥有已解析到本机的域名？(留空使用自签证书): ' INPUT_H_DOMAIN
+        read -r -ep '   [HY2] 是否拥有已解析到本机的域名？(留空使用默认自签证书): ' INPUT_H_DOMAIN
         HY2_DOMAIN="$INPUT_H_DOMAIN"
         if [[ -n "$HY2_DOMAIN" ]]; then
             valid_domain "$HY2_DOMAIN" || die "域名格式非法: $HY2_DOMAIN"
             [[ "${GLOBAL_PUBLIC_IP:-N/A}" != 'N/A' ]] && verify_domain_points_to_self "$HY2_DOMAIN" "$GLOBAL_PUBLIC_IP"
         fi
 
-        read -r -ep '   [HY2] 是否开启端口跳跃 (中国移动等单端口被限速环境建议开启)? [y/N]: ' INPUT_H_HOP
+        read -r -ep '   [HY2] 是否开启端口跳跃 (单端口被限速环境建议开启)? [y/N]: ' INPUT_H_HOP
         if [[ "$INPUT_H_HOP" =~ ^[Yy]$ ]]; then
             HY2_HOP='true'
             HY2_RANGE_START=20000
@@ -976,7 +976,7 @@ pre_install_setup() {
         fi
     fi
 
-    read -r -ep '   [全局] 是否开启 TCP KeepAlive (45s) 防治 NAT 空闲断连? [y/N]: ' INPUT_KA
+    read -r -ep '   [全局] 是否开启 连接保持 TCP KeepAlive (45s) 防治 NAT 空闲断连? [y/N]: ' INPUT_KA
     [[ "$INPUT_KA" =~ ^[Yy]$ ]] && ENABLE_KEEPALIVE='true' || ENABLE_KEEPALIVE='false'
     msg "${CYAN}======================================================================${NC}\n"
 
