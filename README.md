@@ -34,11 +34,12 @@
 <a name="-features-cn"></a>
 ### ✨ 核心亮点
 
-* **自动化加密隧道部署**: 一键自动化安装 VLESS-Reality、Hysteria 2、Shadowsocks 等主流安全传输协议。支持自定义SNI和标准服务端口的物理链路复用与高性能分发。
-* **隐私增强与流量拟态技术**: 深度集成 Reality 架构与 uTLS 指纹模拟方案。通过原生拟态技术提升加密通讯流量的隐蔽性与私密性，有效保护数据在复杂网络环境下的传输安全。
-* **物理内核协议栈调优**: 自动注入并激活 BBR 拥塞控制算法。将系统 TCP 并发句柄及文件描述符提升至物理极限，彻底释放服务器带宽潜能。
-* **环境一致性自愈引擎**: 提供一键诊断修复。清理死锁端口及残留的冗余防火墙规则，确保系统环境恢复至“绝对真空”的纯净状态，解决底层冲突。
-* **自动化配额熔断机制**: 依托 vnstat 实时链路流量监控，支持预设月度流量使用阈值。在流量触顶时触发服务自动熔断保护。
+* **自动化加密隧道部署**: 一键自动化安装 VLESS-Reality、Hysteria 2、Shadowsocks 等主流安全传输协议。支持自定义 SNI 和标准服务端口的物理链路复用与高性能分发。
+* **零信任资产校验体系**: 摒弃非官方镜像源，核心二进制文件强制启用 SHA-256 与 ELF/ZIP 幻数结构强校验，彻底阻断任何形式的供应链投毒攻击。
+* **原生防阻断与端口跳跃**: 深度集成 Reality 架构与 uTLS 指纹模拟。完美融合 Hysteria 2 官方内核级端口跳跃（Port Hopping）与动态 iptables/ip6tables 转发，提升极端网络下的穿透存活率。
+* **物理内核协议栈调优**: 自动注入并激活 BBR 拥塞控制算法，修复内核级 TCP KeepAlive。将系统 TCP 并发句柄及文件描述符提升至物理极限，彻底释放服务器带宽潜能。
+* **环境自愈**: 依托原子化临时文件（mktemp）与 ss 精确端口抓取，脚本能在不伤及宿主机原有合规业务（如 Nginx/Docker）的前提下，实现精准的死锁清理与服务自愈。
+* **自动化配额熔断机制**: 依托 vnstat 实时链路流量监控，支持预设月度流量使用阈值。在流量触顶时立刻触发服务原子级熔断保护，防止云服务超支。
 
 ---
 <a name="-arch-cn"></a>
@@ -77,15 +78,16 @@ sb
 ---
 ### 📋面板菜单速览：
 
-* 1-10: 核心架构编排 - 分别对应 Xray (1-5) 与 Sing-box (6-10) 的部署组合。
-* 11: 测速与 IP 审计 - 调用 bench.sh 与 Check.Place 检测 VPS 性能与 IP 欺诈分。
-* 12: VPS 一键优化 - 物理注入 BBR 算法并提升内核并发句柄。
-* 13: 节点参数显示 - 以明文及 Clash Meta YAML 格式输出当前配置。
-* 14: 脚本说明书 - 所有功能详细解释避坑指南。
-* 15: 脚本OTA升级与Geo资源更新 - 绕过缓存同步 GitHub 远端源码，实现脚本无损热更新。
-* 16: 一键清空 - 提供物理级完全清场模式，彻底粉碎节点、配置与防火墙规则。
-* 17: 环境自愈 - 扫描死锁、清理脏路由、连通性探测。
-* 18: 流量管控 - 基于 vnstat 监控流量，支持到达月度阈值后自动熔断服务以防超支。
+* **1-10: 核心架构编排** - 分别对应 Xray (1-5) 与 Sing-box (6-10) 的顶级加密协议组合。
+* **11: 测速与 IP 审计** - 调用 bench.sh 与 Check.Place 检测 VPS 硬件性能与 IP 纯净度。
+* **12: VPS 一键优化** - 物理注入 BBR 算法，提升并发句柄，并修复双向 TCP KeepAlive。
+* **13: 节点参数显示** - 以明文高保真格式及 Clash Meta YAML / v2rayN JSON 格式输出当前拓扑配置。
+* **14: 脚本说明书** - 详尽的协议工作原理、客户端对接指南与防坑说明。
+* **15: OTA 升级与 Geo 资源** - 绕过本地缓存强制拉取 GitHub 远端源码热更新，及 Loyalsoldier Geo 路由数据闭环更替。
+* **16: 一键清空卸载** - 提供物理级完全清场与保留脚本两种模式，彻底粉碎配置并逆向抹除 iptables 锚定规则。
+* **17: 删除节点与环境初始化** - L4 内核套接字深度自愈，自动扫描进程死锁、清除脏路由表并重置系统环境。
+* **18: 每月流量管控限制** - 基于网卡物理口径精确计算流量，支持到达阈值后的强行阻断机制。
+* **19: SS-2022 白名单管理** - 支持 IPv4 与 IPv6 (CIDR) 双栈混合录入，动态新增/删除或开启全网 DROP，防御主动探测。
 
 ---
 ---
@@ -114,11 +116,12 @@ sb
 <a name="-key-features"></a>
 ### ✨ Key Features
 
-* **Automated Encryption Tunnel Deployment**: Automatically install popular secure transmission protocols such as VLESS-Reality, Hysteria 2, and Shadowsocks with a single click. Support custom SNI and the reuse of standard server ports for physical link multiplexing and high-performance distribution.
-* **Privacy Enhancement and Traffic Mimicry Technology**: Deeply integrate the Reality architecture with the uTLS fingerprint simulation solution. Utilize native mimicry technology to enhance the concealment and privacy of encrypted communication traffic, effectively protecting data transmission security in complex network environments.
-* **Physical Kernel Protocol Stack Optimization**: Automatically inject and activate the BBR congestion control algorithm. Increase the system's TCP concurrent handles and file descriptors to the physical limit of fully releasing the server's bandwidth potential.
-* **Environment Consistency Self-healing Engine**: Provides one-click diagnostic and repair. Clean up deadlocked ports and redundant firewall rules to ensure the system environment is restored to an "absolutely clean" state, resolving underlying conflicts.
-* **Automated Quota Bursting Mechanism**: Relying on vnstat's real-time link traffic monitoring, support preset monthly traffic usage thresholds. Trigger automatic service bursting protection when traffic reaches the limit.
+* **Automated Encryption Tunnel Deployment**: Automatically install popular secure transmission protocols such as VLESS-Reality, Hysteria 2, and Shadowsocks with a single click. Supports custom SNI and physical link multiplexing of standard server ports.
+* **Zero-Trust Asset Verification**: Abandons unofficial mirror sources. Core binaries forcefully enforce SHA-256 and ELF/ZIP magic number validation, completely blocking supply chain poisoning attacks.
+* **Native Port Hopping & Mimicry**: Deeply integrates Reality architecture with uTLS fingerprint simulation. Perfectly merges Hysteria 2's official native port hopping with dynamic iptables/ip6tables forwarding to enhance survival rates in extreme network conditions.
+* **Physical Kernel Protocol Stack Optimization**: Automatically injects and activates the BBR congestion control algorithm and fixes kernel-level TCP KeepAlive. Pushes the system's TCP concurrent handles and file descriptors to absolute limits.
+* **Isolated L4 Probes & Self-Healing**: Utilizing atomic temporary files (mktemp) and precise port grabbing (ss), the script achieves accurate deadlock clearing without affecting existing legitimate processes (like Nginx/Docker).
+* **Automated Quota Circuit Breaker**: Relying on vnstat's real-time link monitoring, it supports preset monthly traffic thresholds. Triggers an automatic atomic service shutdown when traffic reaches the limit to prevent cloud over-billing.
 
 ---
 <a name="-architecture-comparison"></a>
@@ -151,15 +154,16 @@ sb
 ---
 ### 📋 Panel Menu Overview:
 
-* **1-10**: Core Architecture Arrangement - Corresponding to the deployment combinations of Xray (1-5) and Sing-box (6-10).
-* **11**: Speed Measurement and IP Audit - Calling bench.sh and Check.Place to detect VPS performance and IP fraud scores.
-* **12**: One-click VPS Optimization - Physically inject BBR algorithm and enhance kernel concurrent handles.
-* **13**: Node Parameter Display - Outputs current topology configuration in plain text and Clash Meta YAML format.
-* **14**: Script Manual - Detailed explanations of all functions and a guide to avoid pitfalls.
-* **15**: Script OTA & Geo Resource Update - Overcomes cache synchronization and synchronizes remote source code from GitHub to achieve lossless hot update of the script.
-* **16**:  One-click Clearing - Provides a physical-level complete clearance mode to completely destroy nodes, configurations, and firewall rules.
-* **17**: Environment Self-healing - Scans for deadlocks, cleans up dirty routes, and conducts connectivity detection.
-* **18**: Traffic Control - Monitors traffic based on vnstat and supports automatic service disconnection upon reaching monthly thresholds to prevent over-consumption.
+* **1-10: Core Architecture Arrangement** - Correspond to top-tier encryption deployments for Xray (1-5) and Sing-box (6-10).
+* **11: Speed & IP Audit** - Calls bench.sh and Check.Place to detect VPS hardware performance and IP purity.
+* **12: One-click VPS Optimization** - Physically injects BBR algorithm, enhances concurrent handles, and fixes bidirectional TCP KeepAlive.
+* **13: View Node Parameters** - Outputs the current topology configuration in plaintext, Clash Meta YAML, and v2rayN JSON formats.
+* **14: Script Manual** - Detailed protocol working principles, client docking guidelines, and pitfall avoidance.
+* **15: OTA & Geo Update** - Bypasses local caches to forcefully pull GitHub remote source code for hot updates and seamlessly replaces Loyalsoldier Geo routing data.
+* **16: One-click Uninstall** - Offers a physical-level complete clear mode to shatter configurations and reversely erase iptables anchor rules.
+* **17: Delete Nodes & Initialization** - Deep self-healing of L4 kernel sockets, automatically scans for process deadlocks, clears dirty route tables, and resets the system environment.
+* **18: Monthly Traffic Control** - Calculates traffic accurately based on physical NIC capacity, supporting forced blocking mechanisms upon reaching limits.
+* **19: SS-2022 Whitelist Manager** - Supports IPv4 and IPv6 (CIDR) dual-stack mixed entry, dynamic addition/deletion, or turning on network-wide DROP to defend against active probing.
 
 ---
 
