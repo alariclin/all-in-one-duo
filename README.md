@@ -1,5 +1,7 @@
 <img width="459" height="427" alt="屏幕快照 2026-05-04 的 06 18 37 上午" src="https://github.com/user-attachments/assets/0a3b2ac1-1d05-4cae-968f-24c2a7bc9953" />
-# 📦 A-Box![Uploading 屏幕快照 2026-05-04 的 06.41.18 上午.png…]()
+<img width="476" height="838" alt="屏幕快照 2026-05-04 的 06 41 18 上午" src="https://github.com/user-attachments/assets/b9f24d38-f4d2-4a08-a409-b7ffdec84151" />
+
+# 📦 A-Box
 
 
 > One-click Linux Network Gateway Toolkit  
