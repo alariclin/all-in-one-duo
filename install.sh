@@ -1815,8 +1815,8 @@ vps_benchmark_menu() {
     msg "${CYAN}======================================================================${NC}"
     msg "${BOLD}${GREEN}本机配置与 IP 测速纯净度 / Benchmark & IP Check${NC}"
     msg "${CYAN}======================================================================${NC}"
-    msg "${YELLOW}1. 本机配置和测速 (bench.sh)${NC}"
-    msg "${YELLOW}2. IP纯净度和测速 (Check.Place)${NC}"
+    msg "${YELLOW}1. 硬件信息与下载测速 (bench.sh)${NC}"
+    msg "${YELLOW}2. 流媒体解锁与回程网络 (Check.Place)${NC}"
     msg "${GREEN}0. 返回主菜单${NC}"
     read -r -ep '请选择 [0-2]: ' bench_choice
     local confirm_remote
@@ -2288,7 +2288,7 @@ main_loop() {
         msg "${GREEN}4.${NC} Hysteria 2 (官方/Apernet)          ${GREEN}9.${NC} Hysteria 2 (Sing-box)"
         msg "${GREEN}5.${NC} 全协议四合一 (Xray+Hy2)            ${GREEN}10.${NC} 全协议三合一 (Sing-box)"
         msg "${BLUE}----------------------------------------------------------------------${NC}"
-        msg "${GREEN}11.${NC} 本机配置与 IP 测速纯净度"
+        msg "${GREEN}11.${NC} 综合工具箱"
         msg "${GREEN}12.${NC} VPS 一键优化"
         msg "${GREEN}13.${NC} 全部节点参数显示"
         msg "${GREEN}14.${NC} 脚本说明书"
