@@ -51,10 +51,11 @@ sudo bash A-Box.sh --lang zh
 sudo bash A-Box.sh --lang en
 ```
 
-静态自测：
+静态自测与状态检查：
 
 ```bash
 sudo bash A-Box.sh --self-test
+sudo bash A-Box.sh --status
 ```
 
 安装后打开控制台：
@@ -77,8 +78,9 @@ sb
 | HY2模式 | 支持自有域名 ACME、自签证书 + 指纹锁定、端口跳跃、masquerade。 |
 | 语言切换 | 首次运行选择中文/英文；菜单 `20` 可切换；支持 `--lang zh/en`。 |
 | 工具箱 | 内置测速、IP检测、本地 SNI 测试、WARP 管理、2G Swap。 |
-| 运维防护 | BBR/FQ、KeepAlive、Fail2Ban、logrotate、健康探针、Geo 更新、月流量管控、SS 白名单。 |
+| 运维防护 | BBR/FQ、KeepAlive、Fail2Ban、logrotate、健康探针、Geo 更新、月流量管控、SS 白名单、`--status` 状态检查。 |
 | 参数导出 | 输出 URI、二维码、Clash/Mihomo YAML、sing-box 出站示例、v2rayN/v2rayNG JSON。 |
+| 部署切换保护 | 安装新核心前会提示：旧托管服务会被停止，彻底删除需使用菜单 16。 |
 
 ---
 
@@ -230,4 +232,3 @@ sb
 ## 📄 License
 
 This project is licensed under the [Apache License 2.0](LICENSE).
-
