@@ -197,9 +197,12 @@ prompt_reality_sni() {
         printf -v prompt "$(tr_msg reality_sni_prompt)" "$label" "$port" "$default_sni"
         read -r -ep "$prompt" input
         input=${input:-$default_sni}
-        valid_sni "$input" || die "$(printf "$(tr_msg bad_sni)" "$input")"
+        if ! valid_sni "$input"; then
+            echo -e "${RED}[!] $(printf "$(tr_msg bad_sni)" "$input")${NC}" >&2
+            continue
+        fi
         if [[ "$port" != '443' ]] && is_apple_like_sni "$input"; then
-            msg "${YELLOW}[!] $(printf "$(tr_msg apple_non443_warn)" "$input")${NC}"
+            echo -e "${YELLOW}[!] $(printf "$(tr_msg apple_non443_warn)" "$input")${NC}" >&2
             printf -v prompt "$(tr_msg continue_or_reset)" "$label"
             read -r -ep "$prompt" answer
             is_yes "$answer" && { printf '%s\n' "$input"; return 0; }
@@ -250,8 +253,49 @@ prompt_https_url() {
             printf '%s\n' "$normalized"
             return 0
         fi
-        msg "${RED}[!] HY2 伪装 URL 非法 / Invalid HY2 masquerade URL: ${input}${NC}"
-        msg "${YELLOW}    正确示例 / Example: https://www.microsoft.com/${NC}"
+        echo -e "${RED}[!] HY2 伪装 URL 非法 / Invalid HY2 masquerade URL: ${input}${NC}" >&2
+        echo -e "${YELLOW}    正确示例 / Example: https://www.microsoft.com/${NC}" >&2
+    done
+}
+
+prompt_port_input() {
+    local label="$1" default_port="$2" input prompt
+    while true; do
+        printf -v prompt "$(tr_msg port_prompt)" "$label" "$default_port"
+        read -r -ep "$prompt" input
+        input="${input:-$default_port}"
+        if valid_port "$input"; then
+            printf '%s\n' "$input"
+            return 0
+        fi
+        echo -e "${RED}[!] $(printf "$(tr_msg bad_port)" "$input")${NC}" >&2
+    done
+}
+
+prompt_ss_port_input() {
+    local label="$1" default_port="$2" input prompt
+    while true; do
+        printf -v prompt "$(tr_msg ss_port_prompt)" "$label" "$default_port"
+        read -r -ep "$prompt" input
+        input="${input:-$default_port}"
+        if valid_port "$input"; then
+            printf '%s\n' "$input"
+            return 0
+        fi
+        echo -e "${RED}[!] $(printf "$(tr_msg bad_port)" "$input")${NC}" >&2
+    done
+}
+
+prompt_positive_int_input() {
+    local prompt="$1" default_value="$2" input
+    while true; do
+        read -r -ep "$prompt" input
+        input="${input:-$default_value}"
+        if valid_positive_int "$input"; then
+            printf '%s\n' "$input"
+            return 0
+        fi
+        echo -e "${RED}[!] 请输入正整数 / Enter a positive integer: ${input}${NC}" >&2
     done
 }
 valid_ipv4_cidr() {
@@ -646,6 +690,54 @@ build_status_str() {
     fi
     [[ -z "$status_str" ]] && status_str="${RED}Stack Stopped${NC}"
     printf '%b' "$status_str"
+}
+
+managed_services_active() {
+    is_service_running xray || is_service_running sing-box || is_service_running hysteria
+}
+
+confirm_deployment_replacement() {
+    local next_core="$1" next_mode="$2" answer current="none"
+    [[ -n "${CORE:-}" || -n "${MODE:-}" ]] && current="${CORE:-unknown}-${MODE:-unknown}"
+    if [[ "$current" == 'none' ]] && ! managed_services_active; then
+        return 0
+    fi
+    msg "${YELLOW}[!] A-Box will stop managed services before deploying a new stack.${NC}"
+    if [[ "${ABOX_LANG:-zh}" == 'en' ]]; then
+        msg "Current config: ${current} | New deployment: ${next_core}-${next_mode}"
+        msg "This stops/disables xray, sing-box and hysteria managed by A-Box, clears A-Box firewall rules, and overwrites /etc/ddr/.env. Existing binaries/config directories are not fully removed unless using menu 16."
+        read -r -ep 'Continue deployment? [Y/N]: ' answer
+    else
+        msg "当前配置: ${current} | 新部署: ${next_core}-${next_mode}"
+        msg '脚本会先停止/禁用 A-Box 托管的 xray、sing-box、hysteria，清理 A-Box 防火墙规则，并覆盖 /etc/ddr/.env。旧核心二进制和配置目录不会被完全删除；彻底删除请用菜单 16。'
+        read -r -ep '继续部署？[Y/N]: ' answer
+    fi
+    is_yes "$answer" || die '已取消部署 / Deployment canceled.'
+}
+
+show_status_report() {
+    local init='unknown' xray_state='unknown' sing_state='unknown' hy2_state='unknown' shortcut_state='missing'
+    [[ -f "$ABOX_ENV" ]] && source "$ABOX_ENV" 2>/dev/null || true
+    if command -v systemctl >/dev/null 2>&1; then
+        init='systemd'
+        xray_state=$(systemctl is-active xray 2>/dev/null || true)
+        sing_state=$(systemctl is-active sing-box 2>/dev/null || true)
+        hy2_state=$(systemctl is-active hysteria 2>/dev/null || true)
+    elif command -v rc-service >/dev/null 2>&1; then
+        init='openrc'
+        rc-service xray status >/dev/null 2>&1 && xray_state='active' || xray_state='inactive'
+        rc-service sing-box status >/dev/null 2>&1 && sing_state='active' || sing_state='inactive'
+        rc-service hysteria status >/dev/null 2>&1 && hy2_state='active' || hy2_state='inactive'
+    fi
+    [[ -x /usr/local/bin/sb ]] && shortcut_state='executable'
+    cat <<EOF_STATUS
+A-Box status
+Init: ${init}
+Config: CORE=${CORE:-} MODE=${MODE:-}
+Services: xray=${xray_state} sing-box=${sing_state} hysteria=${hy2_state}
+Shortcut: /usr/local/bin/sb=${shortcut_state}
+Config file: ${ABOX_ENV}
+EOF_STATUS
 }
 
 save_firewall_rules() {
@@ -1190,26 +1282,17 @@ pre_install_setup() {
     msg "${BLUE}----------------------------------------------------------------------${NC}"
 
     if [[ "$HAS_VISION" == 'true' ]]; then
-        printf -v prompt "$(tr_msg port_prompt)" "$L_VISION" "$DEF_V_PORT"
-        read -r -ep "$prompt" INPUT_V_PORT
-        VLESS_PORT=${INPUT_V_PORT:-$DEF_V_PORT}
-        valid_port "$VLESS_PORT" || die "$(printf "$(tr_msg bad_port)" "$VLESS_PORT")"
+        VLESS_PORT=$(prompt_port_input "$L_VISION" "$DEF_V_PORT")
         VISION_SNI=$(prompt_reality_sni "$L_VISION" "$VLESS_PORT")
     fi
     if [[ "$HAS_XHTTP" == 'true' ]]; then
-        printf -v prompt "$(tr_msg port_prompt)" "$L_XHTTP" "$DEF_X_PORT"
-        read -r -ep "$prompt" INPUT_X_PORT
-        XHTTP_PORT=${INPUT_X_PORT:-$DEF_X_PORT}
-        valid_port "$XHTTP_PORT" || die "$(printf "$(tr_msg bad_port)" "$XHTTP_PORT")"
+        XHTTP_PORT=$(prompt_port_input "$L_XHTTP" "$DEF_X_PORT")
         XHTTP_SNI=$(prompt_reality_sni "$L_XHTTP" "$XHTTP_PORT")
     fi
     VLESS_SNI=${VISION_SNI:-${XHTTP_SNI:-www.microsoft.com}}
 
     if [[ "$HAS_HY2" == 'true' ]]; then
-        printf -v prompt "$(tr_msg port_prompt)" "$L_HY2" "$DEF_H_PORT"
-        read -r -ep "$prompt" INPUT_H_PORT
-        HY2_BASE_PORT=${INPUT_H_PORT:-$DEF_H_PORT}
-        valid_port "$HY2_BASE_PORT" || die "$(printf "$(tr_msg bad_port)" "$HY2_BASE_PORT")"
+        HY2_BASE_PORT=$(prompt_port_input "$L_HY2" "$DEF_H_PORT")
 
         if [[ "${ABOX_LANG:-zh}" == 'en' ]]; then
             read -r -ep "   ${L_HY2} Do you have a domain already resolved to this server? (empty = self-signed certificate): " INPUT_H_DOMAIN
@@ -1252,19 +1335,15 @@ pre_install_setup() {
         fi
 
         if [[ "${ABOX_LANG:-zh}" == 'en' ]]; then
-            read -r -ep "   ${L_HY2} Downlink Mbps (default: 1000): " INPUT_H_DOWN
+            HY2_DOWN=$(prompt_positive_int_input "   ${L_HY2} Downlink Mbps (default: 1000): " 1000)
         else
-            read -r -ep "   ${L_HY2} 下行速率(Mbps) (回车默认: 1000): " INPUT_H_DOWN
+            HY2_DOWN=$(prompt_positive_int_input "   ${L_HY2} 下行速率(Mbps) (回车默认: 1000): " 1000)
         fi
-        HY2_DOWN=${INPUT_H_DOWN:-1000}
-        valid_positive_int "$HY2_DOWN" || die "速率非法 / Invalid rate: $HY2_DOWN"
         if [[ "${ABOX_LANG:-zh}" == 'en' ]]; then
-            read -r -ep "   ${L_HY2} Uplink Mbps (default: 100): " INPUT_H_UP
+            HY2_UP=$(prompt_positive_int_input "   ${L_HY2} Uplink Mbps (default: 100): " 100)
         else
-            read -r -ep "   ${L_HY2} 上行速率(Mbps) (回车默认: 100): " INPUT_H_UP
+            HY2_UP=$(prompt_positive_int_input "   ${L_HY2} 上行速率(Mbps) (回车默认: 100): " 100)
         fi
-        HY2_UP=${INPUT_H_UP:-100}
-        valid_positive_int "$HY2_UP" || die "速率非法 / Invalid rate: $HY2_UP"
 
         local masq_default="https://${VISION_SNI:-${XHTTP_SNI:-www.samsung.com}}/"
         if [[ "${ABOX_LANG:-zh}" == 'en' ]]; then
@@ -1274,10 +1353,7 @@ pre_install_setup() {
         fi
     fi
     if [[ "$HAS_SS" == 'true' ]]; then
-        printf -v prompt "$(tr_msg ss_port_prompt)" "$L_SS" "$DEF_S_PORT"
-        read -r -ep "$prompt" INPUT_S_PORT
-        SS_PORT=${INPUT_S_PORT:-$DEF_S_PORT}
-        valid_port "$SS_PORT" || die "$(printf "$(tr_msg bad_port)" "$SS_PORT")"
+        SS_PORT=$(prompt_ss_port_input "$L_SS" "$DEF_S_PORT")
         if [[ "${ABOX_LANG:-zh}" == 'en' ]]; then
             read -r -ep "   ${L_SS} Enter frontend whitelist IP/CIDR (empty = open to all, space-separated): " INPUT_SS_WL
         else
@@ -1482,6 +1558,7 @@ deploy_official_hy2() {
         clear; msg "${BOLD}${GREEN}部署官方 Hysteria 2${NC}"
         init_system_environment
         source "$ABOX_ENV" 2>/dev/null || true
+        confirm_deployment_replacement hysteria HY2
         release_ports
         clean_nat_rules
         clean_input_rules
@@ -1593,6 +1670,7 @@ deploy_xray() {
     clear; msg "${BOLD}${GREEN}部署 Xray-core [$MODE_IN]${NC}"
     init_system_environment
     source "$ABOX_ENV" 2>/dev/null || true
+    confirm_deployment_replacement xray "$MODE_IN"
     release_ports
     clean_nat_rules
     clean_input_rules
@@ -1679,6 +1757,7 @@ deploy_singbox() {
     clear; msg "${BOLD}${GREEN}部署 Sing-box 核心 [$MODE_IN]${NC}"
     init_system_environment
     source "$ABOX_ENV" 2>/dev/null || true
+    confirm_deployment_replacement singbox "$MODE_IN"
     release_ports
     clean_nat_rules
     clean_input_rules
@@ -2677,6 +2756,7 @@ Usage:
   bash A-Box.sh --lang zh          设置中文并启动 / Use Chinese UI
   bash A-Box.sh --lang en          Use English UI / 设置英文并启动
   bash A-Box.sh --self-test        运行无副作用静态自测 / Run static self-test
+  bash A-Box.sh --status           显示当前配置和服务状态 / Show current status
   bash A-Box.sh --help             显示命令行帮助 / Show help
 EOF_HELP
 }
@@ -2703,6 +2783,7 @@ run_self_tests() {
     assert_bad valid_url_https http://example.com/
     assert_bad valid_url_https 'https://bad example.com/'
     [[ "$(normalize_https_url_input www.microsoft.com)" == 'https://www.microsoft.com/' ]] || { echo 'FAIL: normalize HTTPS URL'; failures=$((failures + 1)); }
+    [[ "$(normalize_https_url_input https://www.microsoft.com)" == 'https://www.microsoft.com/' ]] || { echo 'FAIL: normalize HTTPS URL trailing slash'; failures=$((failures + 1)); }
     assert_ok valid_ipv4_cidr 192.0.2.1/24
     assert_bad valid_ipv4_cidr 999.0.2.1/24
     assert_ok valid_ipv6_cidr 2001:db8::1/64
@@ -2749,6 +2830,7 @@ main() {
     case "${1:-}" in
         --help|-h) show_cli_help; exit 0 ;;
         --self-test) run_self_tests; exit $? ;;
+        --status) show_status_report; exit 0 ;;
         --lang)
             ABOX_LANG_OVERRIDE="${2:-zh}"
             enter_runtime "$@"
