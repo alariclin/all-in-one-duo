@@ -1,8 +1,7 @@
 [English](README.md) | [简体中文](README-zh.md) | [Русский](README-ru.md) | [فارسی](README-fa.md)
 
-<img width="459" height="427" alt="A-Box logo" src="https://github.com/user-attachments/assets/0a3b2ac1-1d05-4cae-968f-24c2a7bc9953" />
+<img width="759" height="760" alt="屏幕快照 2026-05-04 的 09 09 41 上午" src="https://github.com/user-attachments/assets/af91c130-6d3b-48f5-9c20-65e3a45c66cb" />
 
-# A-Box
 
 > One-click Linux Network Gateway Toolkit  
 > Born May 1, 2026
