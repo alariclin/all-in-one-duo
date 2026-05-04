@@ -2,7 +2,6 @@
 
 <img width="459" height="427" alt="логотип A-Box" src="https://github.com/user-attachments/assets/0a3b2ac1-1d05-4cae-968f-24c2a7bc9953" />
 
-# A-Box
 
 > Инструментарий для развертывания сетевого шлюза Linux в один шаг  
 > Born May 1, 2026
