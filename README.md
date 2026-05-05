@@ -1,6 +1,7 @@
 [English](README.md) | [简体中文](README-zh.md) | [Русский](README-ru.md) | [فارسی](README-fa.md)
 
-<img width="1254" height="1254" alt="ChatGPT Image 2026年5月5日 23_44_47" src="https://github.com/user-attachments/assets/15133a7c-fe7f-4d62-8809-7d2c18e7263a" />
+<img width="1254" height="1254" alt="ChatGPT Image 2026年5月5日 23_49_53" src="https://github.com/user-attachments/assets/4fc888b2-3106-479b-a495-5234b627cd2b" />
+
 
 
 
