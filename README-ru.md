@@ -1,6 +1,7 @@
 [English](README.md) | [简体中文](README-zh.md) | [Русский](README-ru.md) | [فارسی](README-fa.md)
 
-<img width="459" height="427" alt="логотип A-Box" src="https://github.com/user-attachments/assets/0a3b2ac1-1d05-4cae-968f-24c2a7bc9953" />
+<img width="620" height="705" alt="屏幕快照 2026-05-06 的 00 11 48 上午" src="https://github.com/user-attachments/assets/6b144895-2fee-408b-86f3-a388cb232b24" />
+
 
 
 > Инструментарий для развертывания сетевого шлюза Linux в один шаг  
