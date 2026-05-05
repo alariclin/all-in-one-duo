@@ -2352,10 +2352,39 @@ run_remote_bash_script() {
     return "$rc"
 }
 
+run_sni_radar_command() {
+    local label="$1" url="$2" workdir sha rc
+    workdir=$(mktemp -d /tmp/A-Box-sni-radar.XXXXXX) || die 'SNI radar temporary directory creation failed.'
+    msg "${YELLOW}[*] Remote script: ${label}${NC}"
+    msg "${YELLOW}[*] Source: ${url}${NC}"
+    (
+        cd "$workdir" || exit 1
+        curl -fsSL -o sni-radar.sh "$url" && chmod +x sni-radar.sh
+    ) || { rm -rf "$workdir"; die "远程脚本下载失败: $label"; }
+    sha=$(sha256sum "${workdir}/sni-radar.sh" | awk '{print $1}')
+    msg "${YELLOW}[*] SHA256: ${sha}${NC}"
+    bash -n "${workdir}/sni-radar.sh" || { rm -rf "$workdir"; die "远程脚本语法校验失败: $label"; }
+    (
+        cd "$workdir" || exit 1
+        ./sni-radar.sh
+    )
+    rc=$?
+    rm -rf "$workdir"
+    return "$rc"
+}
+
 run_local_sni_benchmark() {
-    local url='https://ghproxy.net/https://gist.githubusercontent.com/alariclin/9779dee79e9d61333e3fe6ba4fc1d315/raw/8b8e9209355869b4e66f94343dea1a995af2b84c/gistfile1.txt'
-    if confirm_yes_no "$(printf "$(tr_msg confirm_remote)" '100-domain SNI benchmark gist')"; then
-        run_remote_bash_script '100-domain SNI benchmark gist' "$url"
+    local url='https://gist.githubusercontent.com/alariclin/8b940706d3986e8f97e857b0954bbcfb/raw/7bda5d48ae0d2b6eb808539bb438224fca70ac24/sni.sh'
+    if confirm_yes_no "$(printf "$(tr_msg confirm_remote)" 'Local SNI preference')"; then
+        run_sni_radar_command 'Local SNI preference' "$url"
+    fi
+    pause_return
+}
+
+run_local_sni_mini_benchmark() {
+    local url='https://gist.githubusercontent.com/alariclin/3aa861bf8b508f904ff3bdf83f209ba1/raw/38cd32ce11d6d3f08a510e21b003024e28937f2d/sni.mini.sh'
+    if confirm_yes_no "$(printf "$(tr_msg confirm_remote)" 'Mini host local SNI preference')"; then
+        run_sni_radar_command 'Mini host local SNI preference' "$url"
     fi
     pause_return
 }
@@ -2394,34 +2423,37 @@ vps_benchmark_menu() {
     msg "${BOLD}${GREEN}$(tr_msg toolbox_title)${NC}"
     msg "${CYAN}======================================================================${NC}"
     if [[ "${ABOX_LANG:-zh}" == 'en' ]]; then
-        msg "${YELLOW}1. System benchmark and download speed (bench.sh)${NC}"
-        msg "${YELLOW}2. IP quality, streaming unlock and route test (Check.Place)${NC}"
-        msg "${YELLOW}3. Local SNI preference test: 100 global whitelist domains${NC}"
-        msg "${YELLOW}4. Cloudflare WARP manager (egress IP masking / streaming unlock)${NC}"
-        msg "${YELLOW}5. Allocate 2G Swap (prevent OOM crashes)${NC}"
+        msg "${YELLOW}1. System benchmark and download speed${NC}"
+        msg "${YELLOW}2. IP quality, streaming unlock and route test${NC}"
+        msg "${YELLOW}3. Local SNI preference${NC}"
+        msg "${YELLOW}4. Mini host local SNI preference${NC}"
+        msg "${YELLOW}5. Cloudflare WARP manager (egress IP masking / streaming unlock)${NC}"
+        msg "${YELLOW}6. Allocate 2G Swap (prevent OOM crashes)${NC}"
         msg "${GREEN}0. Back${NC}"
     else
-        msg "${YELLOW}1. 本机配置和下载测速 (bench.sh)${NC}"
-        msg "${YELLOW}2. IP纯净度、流媒体解锁与回程测试 (Check.Place)${NC}"
-        msg "${YELLOW}3. 本地 SNI 优选：100 个全球白名单域名全维度测速${NC}"
-        msg "${YELLOW}4. Cloudflare WARP 一键接管 (出站 IP 伪装/流媒体解锁)${NC}"
-        msg "${YELLOW}5. Swap 虚拟内存一键划拨 2G (防 OOM 宕机)${NC}"
+        msg "${YELLOW}1. 本机配置和下载测速${NC}"
+        msg "${YELLOW}2. IP纯净度、流媒体解锁与回程测试${NC}"
+        msg "${YELLOW}3. 本地 SNI 优选${NC}"
+        msg "${YELLOW}4. 微型主机本地 SNI 优选${NC}"
+        msg "${YELLOW}5. Cloudflare WARP 一键接管 (出站 IP 伪装/流媒体解锁)${NC}"
+        msg "${YELLOW}6. Swap 虚拟内存一键划拨 2G (防 OOM 宕机)${NC}"
         msg "${GREEN}0. 返回主菜单${NC}"
     fi
     local bench_choice
-    read -r -ep 'Select [0-5]: ' bench_choice
+    read -r -ep 'Select [0-6]: ' bench_choice
     case "$bench_choice" in
         1)
-            confirm_yes_no "$(printf "$(tr_msg confirm_remote)" 'bench.sh')" && run_remote_bash_script 'bench.sh' 'https://bench.sh'
+            confirm_yes_no "$(printf "$(tr_msg confirm_remote)" 'System benchmark and download speed')" && run_remote_bash_script 'System benchmark and download speed' 'https://bench.sh'
             pause_return
             ;;
         2)
-            confirm_yes_no "$(printf "$(tr_msg confirm_remote)" 'Check.Place')" && run_remote_bash_script 'Check.Place' 'https://Check.Place' -I
+            confirm_yes_no "$(printf "$(tr_msg confirm_remote)" 'IP quality, streaming unlock and route test')" && run_remote_bash_script 'IP quality, streaming unlock and route test' 'https://Check.Place' -I
             pause_return
             ;;
         3) run_local_sni_benchmark ;;
-        4) run_warp_manager ;;
-        5) setup_swap_2g ;;
+        4) run_local_sni_mini_benchmark ;;
+        5) run_warp_manager ;;
+        6) setup_swap_2g ;;
         *) return 0 ;;
     esac
 }
@@ -2836,7 +2868,7 @@ show_usage() {
 
 [Operations]
 11 Toolbox
-   bench.sh hardware/speed test; Check.Place IP/streaming/route test; 100-domain local SNI benchmark; Cloudflare WARP manager; 2G Swap allocation.
+   System benchmark/download speed; IP quality/streaming unlock/route test; local SNI preference; mini host local SNI preference; Cloudflare WARP manager; 2G Swap allocation.
 12 VPS One-click Optimization
    BBR/FQ, file descriptor limits, KeepAlive injection, health probe, logrotate/fail2ban defense.
 13 Display Node Parameters
@@ -2882,7 +2914,7 @@ EOF_USAGE
 
 【运维类】
 11 综合工具箱
-   bench.sh硬件/下载测速；Check.Place IP纯净度/流媒体/回程；100域名本地SNI优选；Cloudflare WARP接管；2G Swap划拨。
+   本机配置/下载测速；IP纯净度/流媒体解锁/回程测试；本地SNI优选；微型主机本地SNI优选；Cloudflare WARP接管；2G Swap划拨。
 12 VPS 一键优化
    BBR/FQ、文件句柄、KeepAlive、健康探针、logrotate/fail2ban防御。
 13 全部节点参数显示
