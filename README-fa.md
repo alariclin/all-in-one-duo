@@ -1,6 +1,7 @@
 [English](README.md) | [简体中文](README-zh.md) | [Русский](README-ru.md) | [فارسی](README-fa.md)
 
-<img width="459" height="427" alt="نشان A-Box" src="https://github.com/user-attachments/assets/0a3b2ac1-1d05-4cae-968f-24c2a7bc9953" />
+![Uploading 屏幕快照 2026-05-06 的 00.11.48 上午.png…]()
+
 
 
 > ابزار یک‌مرحله‌ای درگاه شبکه برای Linux  
