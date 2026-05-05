@@ -1,6 +1,7 @@
 [English](README.md) | [简体中文](README-zh.md) | [Русский](README-ru.md) | [فارسی](README-fa.md)
 
-<img width="459" height="427" alt="A-Box 标志" src="https://github.com/user-attachments/assets/0a3b2ac1-1d05-4cae-968f-24c2a7bc9953" />
+<img width="620" height="705" alt="屏幕快照 2026-05-06 的 00 11 48 上午" src="https://github.com/user-attachments/assets/4a2c06a1-3fbb-4d17-8305-44fc6a391c7e" />
+
 
 
 > 一键部署的 Linux 网络网关工具箱  
