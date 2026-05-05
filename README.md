@@ -1,6 +1,7 @@
 [English](README.md) | [简体中文](README-zh.md) | [Русский](README-ru.md) | [فارسی](README-fa.md)
 
-<img width="1254" height="1254" alt="ChatGPT Image 2026年5月5日 23_49_53" src="https://github.com/user-attachments/assets/4fc888b2-3106-479b-a495-5234b627cd2b" />
+<img width="620" height="705" alt="屏幕快照 2026-05-06 的 00 11 48 上午" src="https://github.com/user-attachments/assets/d4292198-ae7d-46c0-89de-4543643d7229" />
+
 
 
 
