@@ -1,6 +1,7 @@
 [English](README.md) | [简体中文](README-zh.md) | [Русский](README-ru.md) | [فارسی](README-fa.md)
 
-![Uploading 屏幕快照 2026-05-06 的 00.11.48 上午.png…]()
+<img width="620" height="705" alt="屏幕快照 2026-05-06 的 00 11 48 上午" src="https://github.com/user-attachments/assets/92827da9-ce36-4db9-ad2d-8579b011de1e" />
+
 
 
 
