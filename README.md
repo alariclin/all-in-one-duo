@@ -7,7 +7,6 @@
 
 
 > One-click Linux Network Gateway Toolkit  
-> Born May 1, 2026
 
 **A-Box** is a one-click Linux network gateway automation toolkit. It combines service deployment, system tuning, traffic control, access management, health checks, parameter export, network quality testing, and a multilingual terminal UI into a single script.
 
