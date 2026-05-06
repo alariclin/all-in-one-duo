@@ -4363,7 +4363,7 @@ main_loop() {
             msg "${GREEN}2.${NC} VLESS-XHTTP-Reality                ${GREEN}7.${NC} Shadowsocks-2022"
             msg "${GREEN}3.${NC} Shadowsocks-2022                   ${GREEN}8.${NC} VLESS + SS-2022"
             msg "${GREEN}4.${NC} Hysteria 2 (Native/Apernet)        ${GREEN}9.${NC} Hysteria 2 (Sing-box)"
-            msg "${GREEN}5.${NC} All-in-one (Xray+Hy2)              ${GREEN}10.${NC} All-in-one (Sing-box)"
+            msg "${GREEN}5.${NC} All-in-one (Xray+Hy2)             ${GREEN}10.${NC} All-in-one (Sing-box)"
             msg "${BLUE}----------------------------------------------------------------------${NC}"
             msg "${GREEN}11.${NC} Toolbox"
             msg "${GREEN}12.${NC} VPS One-click Optimization"
@@ -4386,7 +4386,7 @@ main_loop() {
             msg "${GREEN}2.${NC} VLESS-XHTTP-Reality                ${GREEN}7.${NC} Shadowsocks-2022"
             msg "${GREEN}3.${NC} Shadowsocks-2022                   ${GREEN}8.${NC} VLESS + SS-2022"
             msg "${GREEN}4.${NC} Hysteria 2 (官方/Apernet)          ${GREEN}9.${NC} Hysteria 2 (Sing-box)"
-            msg "${GREEN}5.${NC} 全协议四合一 (Xray+Hy2)            ${GREEN}10.${NC} 全协议三合一 (Sing-box)"
+            msg "${GREEN}5.${NC} 全协议四合一 (Xray+Hy2)           ${GREEN}10.${NC} 全协议三合一 (Sing-box)"
             msg "${BLUE}----------------------------------------------------------------------${NC}"
             msg "${GREEN}11.${NC} 综合工具箱"
             msg "${GREEN}12.${NC} VPS 一键优化"
@@ -4398,7 +4398,7 @@ main_loop() {
             msg "${GREEN}18.${NC} 每月流量管控限制"
             msg "${GREEN}19.${NC} SS-2022 白名单 IP 管理"
             msg "${GREEN}20.${NC} 语言设置 / Language"
-            msg "${GREEN}0.${NC} 退出脚本"
+            msg "${GREEN} 0.${NC} 退出脚本"
             msg "${BLUE}======================================================================${NC}"
             read -r -ep "$(tr_msg main_command)" choice
         fi
