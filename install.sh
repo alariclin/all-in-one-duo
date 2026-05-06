@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # ==============================A-Box===============================
+# SNI profile: built-in maximum REALITY target candidate library; no legacy remote SNI script dependency.
 set -o pipefail
 export DEBIAN_FRONTEND=noninteractive
 export LANG=${LANG:-en_US.UTF-8}
@@ -183,11 +184,9 @@ is_apple_like_sni() {
 
 default_sni_for_port() {
     local port="${1:-443}"
-    if [[ "$port" == '443' ]]; then
-        printf 'www.apple.com'
-    else
-        printf 'www.microsoft.com'
-    fi
+    # Avoid Apple/iCloud as a default target. Xray-core emits warnings for apple/icloud
+    # targets and for non-443 listeners; use toolbox SNI radar results for production.
+    printf 'www.microsoft.com'
 }
 
 prompt_reality_sni() {
@@ -2352,42 +2351,1068 @@ run_remote_bash_script() {
     return "$rc"
 }
 
-run_sni_radar_command() {
-    local label="$1" url="$2" workdir sha rc
+
+
+write_sni_candidate_library() {
+    local profile="${1:-full}" out="$2" raw generated tmp remote_tmp max_count variant_count
+    [[ -n "$out" ]] || die 'SNI candidate output path missing.'
+    raw=$(mktemp /tmp/A-Box-sni-lib.XXXXXX) || die 'SNI library temporary file creation failed.'
+    generated=$(mktemp /tmp/A-Box-sni-lib-generated.XXXXXX) || { rm -f "$raw"; die 'SNI generated library temporary file creation failed.'; }
+    tmp=$(mktemp /tmp/A-Box-sni-lib-filtered.XXXXXX) || { rm -f "$raw" "$generated"; die 'SNI library filtered temporary file creation failed.'; }
+
+    cat > "$raw" <<'EOF_SNI_CANDIDATES'
+www.confluent.io
+www.apache.org
+www.microsoft.com
+learn.microsoft.com
+www.bing.com
+www.office.com
+www.linkedin.com
+www.github.com
+github.com
+docs.github.com
+raw.githubusercontent.com
+www.cloudflare.com
+developers.cloudflare.com
+www.fastly.com
+www.akamai.com
+www.google.com
+cloud.google.com
+firebase.google.com
+developers.google.com
+www.gstatic.com
+www.youtube.com
+www.amazon.com
+aws.amazon.com
+docs.aws.amazon.com
+www.oracle.com
+www.ibm.com
+www.redhat.com
+www.docker.com
+docs.docker.com
+hub.docker.com
+www.kubernetes.io
+kubernetes.io
+helm.sh
+prometheus.io
+grafana.com
+www.elastic.co
+www.mongodb.com
+www.postgresql.org
+www.mysql.com
+www.sqlite.org
+www.redis.io
+redis.io
+www.nginx.com
+nginx.org
+www.envoyproxy.io
+envoyproxy.io
+istio.io
+www.terraform.io
+www.hashicorp.com
+www.vaultproject.io
+www.consul.io
+www.nomadproject.io
+www.ansible.com
+www.jenkins.io
+www.gitlab.com
+docs.gitlab.com
+about.gitlab.com
+www.bitbucket.org
+www.atlassian.com
+www.jetbrains.com
+www.python.org
+docs.python.org
+pypi.org
+www.npmjs.com
+nodejs.org
+www.typescriptlang.org
+www.rust-lang.org
+crates.io
+golang.org
+go.dev
+pkg.go.dev
+www.java.com
+openjdk.org
+www.eclipse.org
+www.scala-lang.org
+kotlinlang.org
+swift.org
+llvm.org
+clang.llvm.org
+cmake.org
+www.gnu.org
+gcc.gnu.org
+www.kernel.org
+www.debian.org
+www.ubuntu.com
+releases.ubuntu.com
+www.fedoraproject.org
+getfedora.org
+www.centos.org
+www.rockylinux.org
+almalinux.org
+archlinux.org
+www.alpinelinux.org
+www.freebsd.org
+www.openbsd.org
+www.netbsd.org
+www.mozilla.org
+developer.mozilla.org
+www.chromium.org
+www.w3.org
+www.ietf.org
+www.rfc-editor.org
+www.openssl.org
+curl.se
+www.wireshark.org
+www.iana.org
+www.icann.org
+www.arin.net
+www.ripe.net
+www.apnic.net
+www.lacnic.net
+www.afrinic.net
+www.cloudflarestatus.com
+status.aws.amazon.com
+status.cloud.google.com
+status.azure.com
+www.datadoghq.com
+www.newrelic.com
+www.splunk.com
+www.sentry.io
+sentry.io
+www.pagerduty.com
+www.postman.com
+www.insomnia.rest
+www.openapis.org
+swagger.io
+www.json.org
+json-schema.org
+yaml.org
+www.markdownguide.org
+www.linuxfoundation.org
+www.cncf.io
+www.opencontainers.org
+www.openstack.org
+www.rancher.com
+www.suse.com
+www.canonical.com
+www.salesforce.com
+www.tableau.com
+www.snowflake.com
+www.databricks.com
+www.vercel.com
+vercel.com
+nextjs.org
+www.netlify.com
+pages.cloudflare.com
+www.heroku.com
+www.digitalocean.com
+docs.digitalocean.com
+www.linode.com
+www.vultr.com
+www.ovhcloud.com
+www.hetzner.com
+www.scaleway.com
+www.backblaze.com
+www.wasabi.com
+www.box.com
+www.dropbox.com
+www.slack.com
+api.slack.com
+www.zoom.us
+support.zoom.us
+www.notion.so
+www.figma.com
+www.canva.com
+www.adobe.com
+www.spotify.com
+www.shopify.com
+www.paypal.com
+www.stripe.com
+stripe.com
+docs.stripe.com
+www.squareup.com
+squareup.com
+www.twilio.com
+www.sendgrid.com
+www.mailgun.com
+www.mailchimp.com
+www.okta.com
+developer.okta.com
+www.auth0.com
+auth0.com
+www.digicert.com
+www.letsencrypt.org
+letsencrypt.org
+www.sectigo.com
+www.globalsign.com
+www.quovadisglobal.com
+www.hardenize.com
+www.ssllabs.com
+www.openai.com
+platform.openai.com
+chatgpt.com
+www.anthropic.com
+www.cohere.com
+www.mistral.ai
+www.perplexity.ai
+huggingface.co
+www.kaggle.com
+www.tensorflow.org
+pytorch.org
+onnx.ai
+opencv.org
+www.r-project.org
+posit.co
+jupyter.org
+www.mathworks.com
+www.wolfram.com
+www.overleaf.com
+www.arxiv.org
+arxiv.org
+www.nature.com
+www.science.org
+www.cell.com
+www.springer.com
+link.springer.com
+www.wiley.com
+onlinelibrary.wiley.com
+www.cambridge.org
+www.oxfordlearnersdictionaries.com
+www.britannica.com
+www.nationalgeographic.com
+www.nasa.gov
+www.noaa.gov
+www.usgs.gov
+www.energy.gov
+www.nist.gov
+www.cisa.gov
+www.cdc.gov
+www.nih.gov
+www.who.int
+www.worldbank.org
+www.imf.org
+www.oecd.org
+www.un.org
+www.wto.org
+www.iso.org
+www.itu.int
+www.ieee.org
+spectrum.ieee.org
+www.acm.org
+dl.acm.org
+www.usenix.org
+www.eff.org
+www.torproject.org
+www.wikipedia.org
+www.wikimedia.org
+commons.wikimedia.org
+meta.wikimedia.org
+www.wikidata.org
+www.archive.org
+archive.org
+www.openstreetmap.org
+www.stackoverflow.com
+stackoverflow.com
+serverfault.com
+superuser.com
+askubuntu.com
+math.stackexchange.com
+unix.stackexchange.com
+security.stackexchange.com
+www.reddit.com
+www.quora.com
+medium.com
+dev.to
+www.freecodecamp.org
+www.codecademy.com
+www.coursera.org
+www.edx.org
+www.udacity.com
+www.khanacademy.org
+www.duolingo.com
+www.udemy.com
+www.pluralsight.com
+www.oreilly.com
+www.infoq.com
+www.dzone.com
+www.baeldung.com
+www.howtogeek.com
+www.tomshardware.com
+www.anandtech.com
+www.phoronix.com
+www.servethehome.com
+www.lwn.net
+lwn.net
+news.ycombinator.com
+www.ycombinator.com
+www.producthunt.com
+www.crunchbase.com
+www.forbes.com
+www.bloomberg.com
+www.reuters.com
+www.apnews.com
+www.bbc.com
+www.cnn.com
+www.npr.org
+www.ft.com
+www.wsj.com
+www.nytimes.com
+www.theguardian.com
+www.economist.com
+www.cnbc.com
+www.marketwatch.com
+www.nasdaq.com
+www.spglobal.com
+www.morningstar.com
+www.investing.com
+www.tradingview.com
+www.coindesk.com
+www.cointelegraph.com
+www.kraken.com
+www.coinbase.com
+www.binance.com
+www.okx.com
+www.bitstamp.net
+www.gemini.com
+www.chainalysis.com
+www.blockchain.com
+etherscan.io
+www.blockchair.com
+www.githubstatus.com
+registry.npmjs.org
+rubygems.org
+packagist.org
+repo.maven.apache.org
+search.maven.org
+plugins.gradle.org
+repo1.maven.org
+nuget.org
+www.nuget.org
+static.rust-lang.org
+storage.googleapis.com
+commondatastorage.googleapis.com
+ajax.googleapis.com
+fonts.googleapis.com
+fonts.gstatic.com
+cdn.jsdelivr.net
+www.jsdelivr.com
+unpkg.com
+cdnjs.cloudflare.com
+assets-global.website-files.com
+www.squarespace.com
+www.wix.com
+www.webflow.com
+www.cloudflareinsights.com
+ssl.gstatic.com
+www.google-analytics.com
+analytics.google.com
+tagmanager.google.com
+www.googletagmanager.com
+www.googleadservices.com
+www.doubleclick.net
+www.facebook.com
+static.xx.fbcdn.net
+www.instagram.com
+www.whatsapp.com
+web.whatsapp.com
+www.snapchat.com
+www.tiktok.com
+www.pinterest.com
+www.tumblr.com
+static.licdn.com
+trailhead.salesforce.com
+www.sap.com
+www.servicenow.com
+www.workday.com
+www.vmware.com
+www.broadcom.com
+www.intel.com
+www.amd.com
+www.nvidia.com
+developer.nvidia.com
+www.arm.com
+www.qualcomm.com
+www.tsmc.com
+www.samsung.com
+www.lg.com
+www.sony.com
+www.panasonic.com
+www.lenovo.com
+www.dell.com
+www.hp.com
+www.asus.com
+www.acer.com
+www.logitech.com
+www.corsair.com
+www.razer.com
+www.lumen.com
+www.cisco.com
+www.juniper.net
+www.arista.com
+www.fortinet.com
+www.paloaltonetworks.com
+www.openssh.com
+www.libssh.org
+www.wireguard.com
+www.strongswan.org
+www.openvpn.net
+www.tailscale.com
+www.zerotier.com
+www.netmaker.io
+www.ngrok.com
+www.cloudflarewarp.com
+one.one.one.one
+www.quic.cloud
+quic.cloud
+www.litespeedtech.com
+www.openresty.org
+openresty.org
+www.haproxy.org
+www.varnish-software.com
+www.varnish-cache.org
+www.memcached.org
+www.rabbitmq.com
+www.kafka.apache.org
+kafka.apache.org
+pulsar.apache.org
+flink.apache.org
+spark.apache.org
+hadoop.apache.org
+beam.apache.org
+airflow.apache.org
+superset.apache.org
+httpd.apache.org
+caddyserver.com
+www.caddyserver.com
+traefik.io
+www.traefik.io
+linkerd.io
+www.linkerd.io
+www.openpolicyagent.org
+www.sigstore.dev
+www.slsa.dev
+www.chainguard.dev
+www.snyk.io
+snyk.io
+www.sonarsource.com
+sonarcloud.io
+www.semgrep.dev
+semgrep.dev
+www.trivy.dev
+trivy.dev
+aquasecurity.github.io
+www.aquasec.com
+www.lacework.com
+www.tenable.com
+www.qualys.com
+www.rapid7.com
+www.mandiant.com
+www.crowdstrike.com
+www.sentinelone.com
+www.sophos.com
+www.bitdefender.com
+www.eset.com
+www.malwarebytes.com
+www.kaspersky.com
+www.trendmicro.com
+www.mcafee.com
+umbrella.cisco.com
+www.cloudflare.tv
+www.apple.com
+www.icloud.com
+www.nike.com
+www.adidas.com
+www.underarmour.com
+www.puma.com
+www.reebok.com
+www.thenorthface.com
+www.patagonia.com
+www.uniqlo.com
+www.zara.com
+www.hm.com
+www.ikea.com
+www.walmart.com
+www.target.com
+www.costco.com
+www.bestbuy.com
+www.homedepot.com
+www.lowes.com
+www.etsy.com
+www.ebay.com
+www.twitch.tv
+www.netflix.com
+www.hulu.com
+www.disneyplus.com
+www.max.com
+www.paramountplus.com
+www.peacocktv.com
+www.primevideo.com
+www.imdb.com
+www.rottentomatoes.com
+www.metacritic.com
+www.soundcloud.com
+www.bandcamp.com
+www.deezer.com
+music.apple.com
+youtu.be
+www.youtube-nocookie.com
+www.vimeo.com
+vimeo.com
+player.vimeo.com
+www.cloudflare-ipfs.com
+ipfs.io
+www.protocol.ai
+protocol.ai
+www.internetcomputer.org
+www.dfinity.org
+www.solana.com
+ethereum.org
+bitcoin.org
+www.linux.org
+www.linux.com
+www.fsfe.org
+www.opensource.org
+opensource.org
+www.creativecommons.org
+creativecommons.org
+www.owasp.org
+owasp.org
+cheatsheetseries.owasp.org
+www.first.org
+www.mitre.org
+cve.mitre.org
+attack.mitre.org
+www.cve.org
+www.cert.org
+www.sei.cmu.edu
+www.cmu.edu
+www.stanford.edu
+www.mit.edu
+www.harvard.edu
+www.berkeley.edu
+www.princeton.edu
+www.yale.edu
+www.ox.ac.uk
+www.cam.ac.uk
+www.ethz.ch
+www.epfl.ch
+www.u-tokyo.ac.jp
+www.kyoto-u.ac.jp
+www.nus.edu.sg
+www.ntu.edu.sg
+www.hku.hk
+www.cuhk.edu.hk
+www.cityu.edu.hk
+www.polyu.edu.hk
+www.unimelb.edu.au
+www.sydney.edu.au
+www.unsw.edu.au
+www.monash.edu
+www.auckland.ac.nz
+www.otago.ac.nz
+www.wgtn.ac.nz
+www.rmit.edu.au
+www.qut.edu.au
+www.uq.edu.au
+www.adelaide.edu.au
+www.anu.edu.au
+www.uwa.edu.au
+www.azure.com
+azure.microsoft.com
+portal.azure.com
+docs.microsoft.com
+visualstudio.microsoft.com
+code.visualstudio.com
+marketplace.visualstudio.com
+devblogs.microsoft.com
+techcommunity.microsoft.com
+www.microsoft365.com
+www.skype.com
+www.xbox.com
+www.msn.com
+www.live.com
+login.live.com
+account.microsoft.com
+www.onedrive.com
+onedrive.live.com
+www.outlook.com
+outlook.live.com
+www.office365.com
+www.windows.com
+www.surface.com
+engineering.linkedin.com
+business.linkedin.com
+learning.linkedin.com
+www.github.blog
+github.blog
+resources.github.com
+education.github.com
+skills.github.com
+cli.github.com
+desktop.github.com
+gist.github.com
+objects.githubusercontent.com
+avatars.githubusercontent.com
+user-images.githubusercontent.com
+www.git-scm.com
+git-scm.com
+training.linuxfoundation.org
+events.linuxfoundation.org
+landscape.cncf.io
+k8s.io
+www.containerd.io
+containerd.io
+www.dockerhub.com
+dockerhub.com
+registry-1.docker.io
+www.mobyproject.org
+mobyproject.org
+www.podman.io
+podman.io
+buildpacks.io
+www.buildpacks.io
+www.openshift.com
+access.redhat.com
+developers.redhat.com
+catalog.redhat.com
+quay.io
+www.quay.io
+docs.ansible.com
+ubuntu.com
+help.ubuntu.com
+wiki.ubuntu.com
+packages.ubuntu.com
+launchpad.net
+debian.org
+packages.debian.org
+wiki.debian.org
+security-tracker.debian.org
+cdn.kernel.org
+git.kernel.org
+mirrors.edge.kernel.org
+wiki.archlinux.org
+aur.archlinux.org
+alpinelinux.org
+pkgs.alpinelinux.org
+www.gentoo.org
+gentoo.org
+wiki.gentoo.org
+docs.freebsd.org
+forums.freebsd.org
+man.openbsd.org
+www.dragonflybsd.org
+fedoraproject.org
+docs.fedoraproject.org
+bodhi.fedoraproject.org
+pagure.io
+src.fedoraproject.org
+centos.org
+rockylinux.org
+wiki.rockylinux.org
+wiki.almalinux.org
+suse.com
+www.opensuse.org
+opensuse.org
+build.opensuse.org
+canonical.com
+multipass.run
+microk8s.io
+maas.io
+juju.is
+cloudflare.com
+blog.cloudflare.com
+radar.cloudflare.com
+dash.cloudflare.com
+community.cloudflare.com
+support.cloudflare.com
+workers.cloudflare.com
+fastly.com
+docs.fastly.com
+developer.fastly.com
+status.fastly.com
+akamai.com
+techdocs.akamai.com
+linode.com
+digitalocean.com
+status.digitalocean.com
+vultr.com
+docs.vultr.com
+status.vultr.com
+ovhcloud.com
+help.ovhcloud.com
+hetzner.com
+docs.hetzner.com
+status.hetzner.com
+scaleway.com
+backblaze.com
+wasabi.com
+www.cloudflare.net
+www.rackspace.com
+rackspace.com
+oracle.com
+docs.oracle.com
+apex.oracle.com
+cloud.oracle.com
+ibm.com
+cloud.ibm.com
+developer.ibm.com
+console.aws.amazon.com
+health.aws.amazon.com
+aws.amazon.com.cn
+www.amazon.science
+console.cloud.google.com
+dl.google.com
+chromium.googlesource.com
+android.googlesource.com
+google.github.io
+opensource.google
+research.google
+ai.google
+blog.google
+workspace.google.com
+www.googlecloudcommunity.com
+tensorflow.org
+keras.io
+jax.readthedocs.io
+pytorch-lightning.readthedocs.io
+cdn-lfs.huggingface.co
+datasets-server.huggingface.co
+www.modelscope.cn
+scikit-learn.org
+numpy.org
+scipy.org
+pandas.pydata.org
+matplotlib.org
+seaborn.pydata.org
+jupyterlab.readthedocs.io
+cran.r-project.org
+mathworks.com
+wolfram.com
+overleaf.com
+export.arxiv.org
+nature.com
+science.org
+cell.com
+cambridge.org
+academic.oup.com
+nasa.gov
+nvlpubs.nist.gov
+csrc.nist.gov
+archive-it.org
+web.archive.org
+reddit.com
+old.reddit.com
+quora.com
+towardsdatascience.com
+hashnode.com
+freecodecamp.org
+codecademy.com
+coursera.org
+edx.org
+udacity.com
+khanacademy.org
+duolingo.com
+udemy.com
+pluralsight.com
+learning.oreilly.com
+infoq.com
+baeldung.com
+crunchbase.com
+tradingview.com
+chainalysis.com
+blockchain.com
+www.litecoin.org
+polygon.technology
+www.polygon.technology
+mongodb.com
+postgresql.org
+mysql.com
+sqlite.org
+rabbitmq.com
+docs.confluent.io
+maven.apache.org
+eclipse.org
+jetbrains.com
+plugins.jetbrains.com
+python.org
+files.pythonhosted.org
+npmjs.com
+rust-lang.org
+static.crates.io
+doc.rust-lang.org
+proxy.golang.org
+sum.golang.org
+jdk.java.net
+scala-lang.org
+openssl.org
+wireshark.org
+iana.org
+icann.org
+datadoghq.com
+newrelic.com
+splunk.com
+pagerduty.com
+postman.com
+insomnia.rest
+rancher.com
+salesforce.com
+tableau.com
+snowflake.com
+databricks.com
+netlify.com
+heroku.com
+box.com
+dropbox.com
+slack.com
+zoom.us
+notion.so
+figma.com
+canva.com
+adobe.com
+helpx.adobe.com
+spotify.com
+shopify.com
+paypal.com
+developer.paypal.com
+status.stripe.com
+twilio.com
+status.twilio.com
+sendgrid.com
+mailgun.com
+mailchimp.com
+okta.com
+digicert.com
+sectigo.com
+globalsign.com
+hardenize.com
+openai.com
+help.openai.com
+status.openai.com
+anthropic.com
+console.anthropic.com
+cohere.com
+mistral.ai
+perplexity.ai
+litespeedtech.com
+EOF_SNI_CANDIDATES
+
+    cat >> "$raw" <<'EOF_SNI_PRIORITY'
+www.confluent.io
+www.apache.org
+learn.microsoft.com
+www.cloudflare.com
+developers.cloudflare.com
+docs.github.com
+www.fastly.com
+www.akamai.com
+www.nginx.com
+nginx.org
+www.postgresql.org
+www.mongodb.com
+www.python.org
+www.rust-lang.org
+go.dev
+pkg.go.dev
+www.kernel.org
+www.debian.org
+www.ubuntu.com
+www.mozilla.org
+developer.mozilla.org
+www.ietf.org
+www.rfc-editor.org
+www.openssl.org
+curl.se
+www.linuxfoundation.org
+www.cncf.io
+www.w3.org
+www.nist.gov
+www.cisa.gov
+EOF_SNI_PRIORITY
+
+    # Generate conservative subdomain variants for strong apexes. Invalid/nonexistent hosts are filtered by TLS probing.
+    awk 'NF && $0 !~ /^#/ {print tolower($0)}' "$raw" | \
+        sed -E 's#^https?://##; s#/.*$##; s/:443$//; s/[[:space:]]//g' | \
+        grep -E '^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$' | \
+        awk '!seen[$0]++' > "$generated"
+
+    awk -F. 'NF>=2 {
+        base=$(NF-1); apex=base "." $NF
+        if (base ~ /^(github|cloudflare|microsoft|google|apache|mozilla|docker|kubernetes|linuxfoundation|cncf|python|rust-lang|golang|go|oracle|ibm|redhat|ubuntu|debian|nginx|postgresql|mongodb|elastic|hashicorp|terraform|confluent|fastly|akamai|digitalocean|linode|vultr|hetzner|ovhcloud|scaleway|openai|anthropic|huggingface|pytorch|tensorflow|ietf|w3|rfc-editor|openssl|curl|gnu|kernel|freebsd|openbsd|netbsd|eclipse|jetbrains|npmjs|nodejs|typescriptlang|redis|sqlite|mysql|wikimedia|wikipedia|archive|stackoverflow|stackexchange|nasa|nist|cisa|stanford|mit|berkeley|cambridge|ox|ethz|epfl|unimelb|sydney|unsw|monash|auckland|cloudfront|amazonaws)$/) print apex
+    }' "$generated" | awk '!seen[$0]++' | while IFS= read -r apex; do
+        for p in www docs doc developer developers api status support blog cdn static assets download downloads registry repo packages pkg files raw resources community help learn training security; do
+            printf '%s.%s\n' "$p" "$apex"
+        done
+        printf '%s\n' "$apex"
+    done >> "$generated"
+
+    awk 'NF && $0 !~ /^#/ {print tolower($0)}' "$generated" | \
+        sed -E 's#^https?://##; s#/.*$##; s/:443$//; s/[[:space:]]//g' | \
+        grep -E '^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$' | \
+        grep -Ev '(^|\.)(doubleclick|googlesyndication|googleadservices|facebook|tiktok|tracking|track|ads|analytics|telemetry)\.' | \
+        awk '!seen[$0]++' > "$tmp"
+
+    if [[ "$profile" == 'mini' ]]; then
+        max_count="${ABOX_SNI_MINI_MAX:-520}"
+    else
+        max_count="${ABOX_SNI_FULL_MAX:-0}"
+    fi
+    if [[ "$max_count" =~ ^[0-9]+$ && "$max_count" -gt 0 ]]; then
+        awk -v n="$max_count" 'NR<=n {print}' "$tmp" > "$out"
+    else
+        cp -f "$tmp" "$out"
+    fi
+    rm -f "$raw" "$generated" "$tmp"
+}
+
+sni_domain_penalty() {
+    local domain="${1,,}" penalty=0
+    case "$domain" in
+        *.apple.com|*.icloud.com|www.apple.com|www.icloud.com) penalty=$((penalty + 1500)) ;;
+        www.nike.com|www.adidas.com|www.amazon.com|www.google.com|www.microsoft.com|www.bing.com|www.youtube.com|www.netflix.com) penalty=$((penalty + 300)) ;;
+        *.facebook.com|*.tiktok.com|*.doubleclick.net|*.googlesyndication.com|*.googleadservices.com) penalty=$((penalty + 2000)) ;;
+    esac
+    case "$domain" in
+        docs.*|developer.*|developers.*|*.apache.org|*.mozilla.org|*.linuxfoundation.org|*.cncf.io|*.ietf.org|*.rfc-editor.org|*.w3.org|*.kernel.org|*.debian.org|*.ubuntu.com|*.cloudflare.com|*.fastly.com|*.confluent.io) penalty=$((penalty - 120)) ;;
+    esac
+    printf '%s\n' "$penalty"
+}
+
+sni_probe_domain() {
+    local domain="$1" raw="$2" timeout_s="${3:-6}" metrics code t_connect t_app t_start t_total http_version remote_ip penalty score tls_args=()
+    [[ "$domain" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$ ]] || return 0
+    if curl --help all 2>/dev/null | grep -q -- '--tlsv1.3'; then
+        tls_args=(--tlsv1.3)
+    fi
+    metrics=$(curl -sSIL "${tls_args[@]}" --connect-timeout "$timeout_s" --max-time "$((timeout_s + 4))" \
+        -o /dev/null \
+        -w '%{http_code}\t%{time_connect}\t%{time_appconnect}\t%{time_starttransfer}\t%{time_total}\t%{http_version}\t%{remote_ip}' \
+        "https://${domain}/" 2>/dev/null) || return 0
+    IFS=$'\t' read -r code t_connect t_app t_start t_total http_version remote_ip <<< "$metrics"
+    [[ "$t_app" =~ ^[0-9.]+$ ]] || return 0
+    awk -v v="$t_app" 'BEGIN{exit !(v>0)}' || return 0
+    penalty=$(sni_domain_penalty "$domain")
+    [[ "$http_version" == '2' || "$http_version" == '3' ]] || penalty=$((penalty + 350))
+    [[ "$code" =~ ^(2|3|4)[0-9][0-9]$ ]] || penalty=$((penalty + 120))
+    score=$(awk -v app="$t_app" -v start="$t_start" -v total="$t_total" -v p="$penalty" 'BEGIN{v=int(app*1000 + start*220 + total*60 + p); if(v<0)v=0; printf "%08d", v}')
+    printf '%s\t%s\tapp=%ss\tttfb=%ss\ttotal=%ss\thttp=%s\tcode=%s\tip=%s\n' "$score" "$domain" "$t_app" "$t_start" "$t_total" "$http_version" "$code" "$remote_ip" >> "$raw"
+}
+
+sni_openssl_check() {
+    local domain="$1" timeout_s="${2:-5}" out cert sanext rest alpn='none' tls13=0 san=0
+    command -v openssl >/dev/null 2>&1 || { printf 'tls13=unknown\talpn=unknown\tsan=unknown'; return 0; }
+    out=$(printf '' | timeout "$timeout_s" openssl s_client -connect "${domain}:443" -servername "$domain" -alpn 'h2,http/1.1' -tls1_3 -showcerts 2>/dev/null) || out=''
+    if [[ -n "$out" ]]; then
+        grep -qiE 'Protocol *: *TLSv1\.3|New, TLSv1\.3' <<< "$out" && tls13=1
+        alpn=$(awk -F': ' '/ALPN protocol/{print $2; exit}' <<< "$out")
+        [[ -n "$alpn" ]] || alpn='none'
+        cert=$(awk 'BEGIN{p=0}/-----BEGIN CERTIFICATE-----/{p=1} p{print} /-----END CERTIFICATE-----/{exit}' <<< "$out")
+        if [[ -n "$cert" ]]; then
+            sanext=$(printf '%s\n' "$cert" | openssl x509 -noout -ext subjectAltName 2>/dev/null | tr '\n' ' ' || true)
+            if grep -qi "DNS:${domain}\b" <<< "$sanext"; then
+                san=1
+            else
+                rest="${domain#*.}"
+                grep -qi "DNS:\*\.${rest}\b" <<< "$sanext" && san=1
+            fi
+        fi
+    fi
+    printf 'tls13=%s\talpn=%s\tsan=%s' "$tls13" "$alpn" "$san"
+}
+
+sni_verify_raw_report() {
+    local raw_sorted="$1" verified="$2" verify_limit="${3:-240}" timeout_s="${4:-5}" line score domain c3 c4 c5 c6 c7 c8 check tls13 alpn san add adj n=0
+    : > "$verified"
+    while IFS=$'\t' read -r score domain c3 c4 c5 c6 c7 c8; do
+        n=$((n + 1))
+        (( n > verify_limit )) && break
+        check=$(sni_openssl_check "$domain" "$timeout_s")
+        tls13=$(awk -F'\t|=' '{for(i=1;i<=NF;i++) if($i=="tls13"){print $(i+1); exit}}' <<< "$check")
+        alpn=$(awk -F'\t|=' '{for(i=1;i<=NF;i++) if($i=="alpn"){print $(i+1); exit}}' <<< "$check")
+        san=$(awk -F'\t|=' '{for(i=1;i<=NF;i++) if($i=="san"){print $(i+1); exit}}' <<< "$check")
+        add=0
+        [[ "$tls13" == '1' ]] || add=$((add + 6000))
+        [[ "$san" == '1' ]] || add=$((add + 6000))
+        [[ "$alpn" == 'h2' ]] || add=$((add + 700))
+        adj=$(awk -v s="$score" -v a="$add" 'BEGIN{printf "%08d", int(s)+int(a)}')
+        printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$adj" "$domain" "$c3" "$c4" "$c5" "$c6" "$c7" "$c8" "$check" >> "$verified"
+    done < "$raw_sorted"
+    sort -n "$verified" -o "$verified"
+}
+
+run_builtin_sni_radar() {
+    local profile="${1:-full}" title="${2:-Local SNI preference}" workdir candidates raw raw_sorted report total concurrency timeout_s running=0 domain topn verify_limit
     workdir=$(mktemp -d /tmp/A-Box-sni-radar.XXXXXX) || die 'SNI radar temporary directory creation failed.'
-    msg "${YELLOW}[*] Remote script: ${label}${NC}"
-    msg "${YELLOW}[*] Source: ${url}${NC}"
-    (
-        cd "$workdir" || exit 1
-        curl -fsSL -o sni-radar.sh "$url" && chmod +x sni-radar.sh
-    ) || { rm -rf "$workdir"; die "远程脚本下载失败: $label"; }
-    sha=$(sha256sum "${workdir}/sni-radar.sh" | awk '{print $1}')
-    msg "${YELLOW}[*] SHA256: ${sha}${NC}"
-    bash -n "${workdir}/sni-radar.sh" || { rm -rf "$workdir"; die "远程脚本语法校验失败: $label"; }
-    (
-        cd "$workdir" || exit 1
-        ./sni-radar.sh
-    )
-    rc=$?
+    candidates="$workdir/candidates.txt"
+    raw="$workdir/results.raw.tsv"
+    raw_sorted="$workdir/results.raw.sorted.tsv"
+    report="$workdir/results.tsv"
+    write_sni_candidate_library "$profile" "$candidates"
+    total=$(wc -l < "$candidates" | tr -d ' ')
+    if [[ "$profile" == 'mini' ]]; then
+        concurrency="${ABOX_SNI_MINI_CONCURRENCY:-12}"
+        timeout_s="${ABOX_SNI_MINI_TIMEOUT:-5}"
+        topn=20
+        verify_limit="${ABOX_SNI_MINI_VERIFY:-120}"
+    else
+        concurrency="${ABOX_SNI_FULL_CONCURRENCY:-36}"
+        timeout_s="${ABOX_SNI_FULL_TIMEOUT:-6}"
+        topn=30
+        verify_limit="${ABOX_SNI_FULL_VERIFY:-360}"
+    fi
+    msg "${CYAN}======================================================================${NC}"
+    msg "${BOLD}${GREEN}${title}${NC}"
+    msg "${CYAN}======================================================================${NC}"
+    msg "${YELLOW}[*] Candidate library: ${total} domains | profile=${profile} | concurrency=${concurrency}${NC}"
+    msg "${YELLOW}[*] Stage 1: HTTPS/TLSv1.3 curl metrics. Stage 2: OpenSSL TLS1.3 + ALPN + SAN verification for top candidates.${NC}"
+    msg "${YELLOW}[*] Fully internal SNI library; no legacy remote SNI scripts or gist extraction are used.${NC}"
+    : > "$raw"
+    while IFS= read -r domain; do
+        sni_probe_domain "$domain" "$raw" "$timeout_s" &
+        running=$((running + 1))
+        if (( running >= concurrency )); then
+            wait
+            running=0
+        fi
+    done < "$candidates"
+    wait
+    if [[ ! -s "$raw" ]]; then
+        rm -rf "$workdir"
+        die 'SNI radar produced no valid HTTPS/TLS results. Check DNS, routing, firewall, curl/OpenSSL support.'
+    fi
+    sort -n "$raw" > "$raw_sorted"
+    sni_verify_raw_report "$raw_sorted" "$report" "$verify_limit" "$timeout_s"
+    if [[ ! -s "$report" ]]; then
+        cp -f "$raw_sorted" "$report"
+    fi
+    mkdir -p "$ABOX_DIR" 2>/dev/null || true
+    cp -f "$report" "$ABOX_DIR/A-Box-sni-${profile}.tsv" 2>/dev/null || true
+    msg "${BLUE}----------------------------------------------------------------------${NC}"
+    msg "${YELLOW}[ Top SNI Candidates / 优选 SNI 候选 ]${NC}"
+    awk -F'\t' -v n="$topn" 'NR<=n {printf "%2d. %-42s %s %s %s %s %s %s\n", NR, $2, $3, $4, $5, $6, $7, $9}' "$report"
+    msg "${BLUE}----------------------------------------------------------------------${NC}"
+    msg "${GREEN}Saved: ${ABOX_DIR}/A-Box-sni-${profile}.tsv${NC}"
+    msg "${YELLOW}Use only domains with tls13=1 and san=1. Prefer per-VPS measured results over fixed Apple/Nike templates.${NC}"
     rm -rf "$workdir"
-    return "$rc"
 }
 
 run_local_sni_benchmark() {
-    local url='https://gist.githubusercontent.com/alariclin/8b940706d3986e8f97e857b0954bbcfb/raw/7bda5d48ae0d2b6eb808539bb438224fca70ac24/sni.sh'
-    if confirm_yes_no "$(printf "$(tr_msg confirm_remote)" 'Local SNI preference')"; then
-        run_sni_radar_command 'Local SNI preference' "$url"
+    if confirm_yes_no "$(printf "$(tr_msg confirm_remote)" 'Built-in extended SNI preference library')"; then
+        run_builtin_sni_radar 'full' 'Local SNI preference / 本地 SNI 优选'
     fi
     pause_return
 }
 
 run_local_sni_mini_benchmark() {
-    local url='https://gist.githubusercontent.com/alariclin/3aa861bf8b508f904ff3bdf83f209ba1/raw/38cd32ce11d6d3f08a510e21b003024e28937f2d/sni.mini.sh'
-    if confirm_yes_no "$(printf "$(tr_msg confirm_remote)" 'Mini host local SNI preference')"; then
-        run_sni_radar_command 'Mini host local SNI preference' "$url"
+    if confirm_yes_no "$(printf "$(tr_msg confirm_remote)" 'Built-in mini-host SNI preference library')"; then
+        run_builtin_sni_radar 'mini' 'Mini host local SNI preference / 微型主机本地 SNI 优选'
     fi
     pause_return
 }
+
+
 
 run_warp_manager() {
     if confirm_yes_no "$(printf "$(tr_msg confirm_remote)" 'fscarmen/warp Cloudflare WARP menu')"; then
@@ -2848,7 +3873,7 @@ show_usage() {
 1  Xray VLESS-Vision-Reality
    TCP REALITY + Vision. Best default for long-term stealth. Port 443 defaults to www.apple.com; non-443 defaults to www.microsoft.com.
 2  Xray VLESS-XHTTP-Reality
-   XHTTP over REALITY. Best high-throughput desktop path with Mihomo v1.19.24+. Recommended: stream-one + h2 + smux disabled. Non-443 SNI defaults to www.microsoft.com.
+   XHTTP over REALITY. Best high-throughput desktop path with Mihomo v1.19.24+. Recommended: stream-one + h2 + smux disabled. Non-443 SNI should be selected by local SNI preference and manually verified for TLS1.3/H2/SAN; avoid Apple/iCloud on non-443.
 3  Xray Shadowsocks-2022
    SS-2022 relay/landing inbound. Default port 2053 TCP/UDP. Best used behind frontend proxies with whitelist.
 4  Native Hysteria 2
@@ -2868,15 +3893,15 @@ show_usage() {
 
 [Operations]
 11 Toolbox
-   System benchmark/download speed; IP quality/streaming unlock/route test; local SNI preference; mini host local SNI preference; Cloudflare WARP manager; 2G Swap allocation.
+   System benchmark/download speed; IP quality/streaming unlock/route test; built-in full SNI preference library; built-in mini-host SNI preference library; Cloudflare WARP manager; 2G Swap allocation.
 12 VPS One-click Optimization
    BBR/FQ, file descriptor limits, KeepAlive injection, health probe, logrotate/fail2ban defense.
 13 Display Node Parameters
    Print URIs, QR codes, Clash/Mihomo YAML, sing-box outbounds, v2rayN/v2rayNG XHTTP JSON.
 14 Manual
    This page.
-15 OTA & Geo Update
-   Update A-Box script and Xray Loyalsoldier geoip/geosite data.
+15 OTA, Geo and Core-only Upgrade
+   Update A-Box script, Xray Loyalsoldier geoip/geosite data, or upgrade installed proxy core binaries without resetting node parameters.
 16 Full/Partial Uninstall
    Remove proxy stack, firewall rules, services and optional sb shortcut.
 17 Environment Reset
@@ -2892,7 +3917,7 @@ EOF_USAGE
         cat <<'EOF_USAGE'
 【部署类】
 1  Xray VLESS-Vision-Reality
-   TCP REALITY + Vision。长期隐蔽主力。443 端口默认 SNI 为 www.apple.com；非443默认 www.microsoft.com。
+   TCP REALITY + Vision。长期隐蔽主力。443/TCP 为主力端口；SNI 应使用工具箱本地优选结果并人工确认 TLS1.3/H2/SAN。Apple/iCloud 仅作 443 备用，不建议非443使用。
 2  Xray VLESS-XHTTP-Reality
    XHTTP over REALITY。桌面高速优先，需 Mihomo v1.19.24+。推荐 stream-one + h2 + 关闭 smux。非443默认 www.microsoft.com。
 3  Xray Shadowsocks-2022
@@ -2914,15 +3939,15 @@ EOF_USAGE
 
 【运维类】
 11 综合工具箱
-   本机配置/下载测速；IP纯净度/流媒体解锁/回程测试；本地SNI优选；微型主机本地SNI优选；Cloudflare WARP接管；2G Swap划拨。
+   本机配置/下载测速；IP纯净度/流媒体解锁/回程测试；内置全量SNI优选库；内置微型主机SNI优选库；Cloudflare WARP接管；2G Swap划拨。
 12 VPS 一键优化
    BBR/FQ、文件句柄、KeepAlive、健康探针、logrotate/fail2ban防御。
 13 全部节点参数显示
    输出 URI、二维码、Clash/Mihomo YAML、sing-box出站、v2rayN/v2rayNG XHTTP JSON。
 14 脚本说明书
    当前页面。
-15 脚本 OTA 升级与 Xray Geo 资源更新
-   更新 A-Box 主脚本和 Xray Loyalsoldier geoip/geosite 数据。
+15 脚本 OTA、Xray Geo 与核心无损升级
+   更新 A-Box 主脚本、Xray Loyalsoldier geoip/geosite 数据，或仅升级当前已安装协议核心且不重置节点参数。
 16 一键全部清空卸载
    删除代理栈、服务、防火墙规则，可选择是否保留 sb 快捷入口。
 17 删除全部节点与环境初始化
@@ -2976,18 +4001,206 @@ force_update_geo() {
     pause_return
 }
 
+
+service_unit_exists() {
+    local srv="$1"
+    if [[ "${INIT_SYS:-}" == 'systemd' ]]; then
+        systemctl list-unit-files "${srv}.service" >/dev/null 2>&1 && return 0
+        [[ -f "/etc/systemd/system/${srv}.service" || -f "/lib/systemd/system/${srv}.service" || -f "/usr/lib/systemd/system/${srv}.service" ]] && return 0
+    else
+        [[ -x "/etc/init.d/${srv}" ]] && return 0
+    fi
+    return 1
+}
+
+restart_service_soft() {
+    local srv="$1"
+    if [[ "${INIT_SYS:-}" == 'systemd' ]]; then
+        systemctl daemon-reload >/dev/null 2>&1 || true
+        systemctl restart "$srv" >/dev/null 2>&1 || return 1
+        sleep 2
+        systemctl is-active --quiet "$srv"
+    else
+        rc-service "$srv" restart >/dev/null 2>&1 || return 1
+        sleep 2
+        rc-service "$srv" status >/dev/null 2>&1
+    fi
+}
+
+restore_binary_backup() {
+    local bin="$1" backup="$2"
+    [[ -n "$backup" && -f "$backup" ]] || return 1
+    install -m 755 "$backup" "$bin"
+}
+
+upgrade_xray_core_only() {
+    local was_active=0 backup='' tmp xray_zip xray_ext old_ver new_ver
+    msg "${YELLOW}[*] Upgrading Xray-core binary only; node parameters will be preserved...${NC}"
+    get_architecture
+    is_service_running xray && was_active=1 || true
+    [[ -x /usr/local/bin/xray ]] && old_ver=$(/usr/local/bin/xray version 2>/dev/null | head -n 1 || true)
+    tmp=$(mktemp -d /tmp/A-Box-core-xray.XXXXXX) || die 'Xray core upgrade temp directory failed.'
+    xray_zip="$tmp/xray_core.zip"
+    xray_ext="$tmp/xray_ext"
+    mkdir -p "$xray_ext"
+    fetch_github_release XTLS/Xray-core xray_core.zip "$xray_zip"
+    unzip -qo "$xray_zip" -d "$xray_ext" || { rm -rf "$tmp"; die 'Xray core archive extraction failed.'; }
+    [[ -f "$xray_ext/xray" ]] || { rm -rf "$tmp"; die 'Xray binary not found after extraction.'; }
+    [[ -x /usr/local/bin/xray ]] && { backup="$tmp/xray.backup"; cp -a /usr/local/bin/xray "$backup"; }
+    install -m 755 "$xray_ext/xray" /usr/local/bin/xray || { rm -rf "$tmp"; die 'Xray binary install failed.'; }
+    new_ver=$(/usr/local/bin/xray version 2>/dev/null | head -n 1 || true)
+    if [[ -f /usr/local/etc/xray/config.json ]]; then
+        if ! /usr/local/bin/xray run -test -config /usr/local/etc/xray/config.json >/dev/null 2>&1; then
+            msg "${RED}[!] New Xray failed current config test. Rolling back binary...${NC}"
+            restore_binary_backup /usr/local/bin/xray "$backup" >/dev/null 2>&1 || true
+            rm -rf "$tmp"
+            die 'Xray core upgrade rolled back because current config is incompatible.'
+        fi
+    fi
+    if [[ "$was_active" == '1' ]]; then
+        if ! restart_service_soft xray; then
+            msg "${RED}[!] New Xray failed to restart. Rolling back binary...${NC}"
+            restore_binary_backup /usr/local/bin/xray "$backup" >/dev/null 2>&1 || true
+            restart_service_soft xray >/dev/null 2>&1 || true
+            rm -rf "$tmp"
+            die 'Xray core upgrade rolled back because service restart failed.'
+        fi
+    fi
+    msg "${GREEN}[OK] Xray-core upgraded.${NC} ${old_ver:-unknown} -> ${new_ver:-unknown}"
+    rm -rf "$tmp"
+}
+
+upgrade_singbox_core_only() {
+    local was_active=0 backup='' tmp sb_tar sb_ext sb_path old_ver new_ver
+    msg "${YELLOW}[*] Upgrading sing-box binary only; node parameters will be preserved...${NC}"
+    get_architecture
+    is_service_running sing-box && was_active=1 || true
+    [[ -x /usr/local/bin/sing-box ]] && old_ver=$(/usr/local/bin/sing-box version 2>/dev/null | head -n 1 || true)
+    tmp=$(mktemp -d /tmp/A-Box-core-singbox.XXXXXX) || die 'sing-box core upgrade temp directory failed.'
+    sb_tar="$tmp/singbox_core.tar.gz"
+    sb_ext="$tmp/extract"
+    mkdir -p "$sb_ext"
+    fetch_github_release SagerNet/sing-box singbox_core.tar.gz "$sb_tar"
+    tar -xzf "$sb_tar" -C "$sb_ext" || { rm -rf "$tmp"; die 'sing-box archive extraction failed.'; }
+    sb_path=$(find "$sb_ext" -type f -name 'sing-box' | head -n 1)
+    [[ -n "$sb_path" && -f "$sb_path" ]] || { rm -rf "$tmp"; die 'sing-box binary not found after extraction.'; }
+    [[ -x /usr/local/bin/sing-box ]] && { backup="$tmp/sing-box.backup"; cp -a /usr/local/bin/sing-box "$backup"; }
+    install -m 755 "$sb_path" /usr/local/bin/sing-box || { rm -rf "$tmp"; die 'sing-box binary install failed.'; }
+    new_ver=$(/usr/local/bin/sing-box version 2>/dev/null | head -n 1 || true)
+    if [[ -f /etc/sing-box/config.json ]]; then
+        if ! /usr/local/bin/sing-box check -c /etc/sing-box/config.json >/dev/null 2>&1; then
+            msg "${RED}[!] New sing-box failed current config check. Rolling back binary...${NC}"
+            restore_binary_backup /usr/local/bin/sing-box "$backup" >/dev/null 2>&1 || true
+            rm -rf "$tmp"
+            die 'sing-box core upgrade rolled back because current config is incompatible.'
+        fi
+    fi
+    if [[ "$was_active" == '1' ]]; then
+        if ! restart_service_soft sing-box; then
+            msg "${RED}[!] New sing-box failed to restart. Rolling back binary...${NC}"
+            restore_binary_backup /usr/local/bin/sing-box "$backup" >/dev/null 2>&1 || true
+            restart_service_soft sing-box >/dev/null 2>&1 || true
+            rm -rf "$tmp"
+            die 'sing-box core upgrade rolled back because service restart failed.'
+        fi
+    fi
+    msg "${GREEN}[OK] sing-box upgraded.${NC} ${old_ver:-unknown} -> ${new_ver:-unknown}"
+    rm -rf "$tmp"
+}
+
+upgrade_hysteria_core_only() {
+    local was_active=0 backup='' tmp hy2_bin old_ver new_ver
+    msg "${YELLOW}[*] Upgrading Hysteria 2 binary only; node parameters will be preserved...${NC}"
+    get_architecture
+    is_service_running hysteria && was_active=1 || true
+    [[ -x /usr/local/bin/hysteria ]] && old_ver=$(/usr/local/bin/hysteria version 2>/dev/null | head -n 1 || true)
+    tmp=$(mktemp -d /tmp/A-Box-core-hysteria.XXXXXX) || die 'Hysteria core upgrade temp directory failed.'
+    hy2_bin="$tmp/hysteria_core"
+    fetch_github_release apernet/hysteria hysteria_core "$hy2_bin"
+    [[ -x /usr/local/bin/hysteria ]] && { backup="$tmp/hysteria.backup"; cp -a /usr/local/bin/hysteria "$backup"; }
+    install -m 755 "$hy2_bin" /usr/local/bin/hysteria || { rm -rf "$tmp"; die 'Hysteria binary install failed.'; }
+    /usr/local/bin/hysteria version >/dev/null 2>&1 || {
+        msg "${RED}[!] New Hysteria binary failed execution check. Rolling back binary...${NC}"
+        restore_binary_backup /usr/local/bin/hysteria "$backup" >/dev/null 2>&1 || true
+        rm -rf "$tmp"
+        die 'Hysteria core upgrade rolled back because binary check failed.'
+    }
+    new_ver=$(/usr/local/bin/hysteria version 2>/dev/null | head -n 1 || true)
+    if [[ "$was_active" == '1' ]]; then
+        if ! restart_service_soft hysteria; then
+            msg "${RED}[!] New Hysteria failed to restart. Rolling back binary...${NC}"
+            restore_binary_backup /usr/local/bin/hysteria "$backup" >/dev/null 2>&1 || true
+            restart_service_soft hysteria >/dev/null 2>&1 || true
+            rm -rf "$tmp"
+            die 'Hysteria core upgrade rolled back because service restart failed.'
+        fi
+    fi
+    msg "${GREEN}[OK] Hysteria upgraded.${NC} ${old_ver:-unknown} -> ${new_ver:-unknown}"
+    rm -rf "$tmp"
+}
+
+upgrade_current_cores_only() {
+    clear
+    init_system_environment
+    source "$ABOX_ENV" 2>/dev/null || true
+    local targets=() answer t
+    if [[ -x /usr/local/bin/xray || -f /usr/local/etc/xray/config.json || "${CORE:-}" == 'xray' ]] || service_unit_exists xray; then
+        targets+=(xray)
+    fi
+    if [[ -x /usr/local/bin/sing-box || -f /etc/sing-box/config.json || "${CORE:-}" == 'singbox' ]] || service_unit_exists sing-box; then
+        targets+=(singbox)
+    fi
+    if [[ -x /usr/local/bin/hysteria || -f /etc/hysteria/config.yaml || "${CORE:-}" == 'hysteria' || ( "${CORE:-}" == 'xray' && "${MODE:-}" == *'ALL'* ) ]] || service_unit_exists hysteria; then
+        targets+=(hysteria)
+    fi
+    if (( ${#targets[@]} == 0 )); then
+        msg "${YELLOW}[!] No installed A-Box core binaries/configs detected.${NC}"
+        pause_return
+        return 0
+    fi
+    msg "${CYAN}======================================================================${NC}"
+    msg "${BOLD}${GREEN}Upgrade current installed proxy cores only / 仅升级当前已安装协议核心${NC}"
+    msg "${CYAN}======================================================================${NC}"
+    msg "Detected cores: ${targets[*]}"
+    msg "This preserves /etc/ddr/.env, UUID, Reality keys, ports, passwords and all node parameters."
+    msg "It downloads GitHub latest release assets, validates the current config where supported, restarts only active services, and rolls back the binary if validation/restart fails."
+    read -r -ep 'Continue core-only upgrade? [Y/N]: ' answer
+    is_yes "$answer" || { msg "${YELLOW}Canceled.${NC}"; pause_return; return 0; }
+    for t in "${targets[@]}"; do
+        case "$t" in
+            xray) upgrade_xray_core_only ;;
+            singbox) upgrade_singbox_core_only ;;
+            hysteria) upgrade_hysteria_core_only ;;
+        esac
+    done
+    msg "${GREEN}All detected core-only upgrades completed. Node parameters were preserved.${NC}"
+    pause_return
+}
+
 ota_and_geo_menu() {
     clear
     msg "${CYAN}======================================================================${NC}"
-    msg "${BOLD}${GREEN}脚本 OTA 升级与 Xray Geo 资源更新${NC}"
-    msg "${CYAN}======================================================================${NC}"
-    msg "${YELLOW}1. 升级 A-Box 核心脚本${NC}"
-    msg "${YELLOW}2. 立即拉取并更新 Xray Loyalsoldier Geo 资源${NC}"
-    msg "${GREEN}0. 返回主菜单${NC}"
-    read -r -ep '请选择 [0-2]: ' ota_choice
+    if [[ "${ABOX_LANG:-zh}" == 'en' ]]; then
+        msg "${BOLD}${GREEN}OTA, Geo and Core-only Upgrade${NC}"
+        msg "${CYAN}======================================================================${NC}"
+        msg "${YELLOW}1. Upgrade A-Box script${NC}"
+        msg "${YELLOW}2. Update Xray Loyalsoldier Geo resources now${NC}"
+        msg "${YELLOW}3. Upgrade current installed proxy cores only; preserve node parameters${NC}"
+        msg "${GREEN}0. Back${NC}"
+        read -r -ep 'Select [0-3]: ' ota_choice
+    else
+        msg "${BOLD}${GREEN}脚本 OTA、Xray Geo 与核心无损升级${NC}"
+        msg "${CYAN}======================================================================${NC}"
+        msg "${YELLOW}1. 升级 A-Box 核心脚本${NC}"
+        msg "${YELLOW}2. 立即拉取并更新 Xray Loyalsoldier Geo 资源${NC}"
+        msg "${YELLOW}3. 仅升级当前已安装协议核心，不重置节点参数${NC}"
+        msg "${GREEN}0. 返回主菜单${NC}"
+        read -r -ep '请选择 [0-3]: ' ota_choice
+    fi
     case "$ota_choice" in
         1) update_script ;;
         2) force_update_geo ;;
+        3) upgrade_current_cores_only ;;
         *) return 0 ;;
     esac
 }
@@ -3047,6 +4260,15 @@ run_self_tests() {
     [[ "$(normalize_https_url_input www.microsoft.com)" == 'https://www.microsoft.com/' ]] || { echo 'FAIL: normalize HTTPS URL'; failures=$((failures + 1)); }
     [[ "$(normalize_https_url_input https://www.microsoft.com)" == 'https://www.microsoft.com/' ]] || { echo 'FAIL: normalize HTTPS URL trailing slash'; failures=$((failures + 1)); }
     [[ "$(build_ss2022_uri 203.0.113.10 2053 'abc+/=')" == 'ss://2022-blake3-aes-128-gcm:abc%2B%2F%3D@203.0.113.10:2053#A-Box-SS' ]] || { echo 'FAIL: SS-2022 SIP002/SIP022 URI percent encoding'; failures=$((failures + 1)); }
+
+    ABOX_SNI_FULL_MAX=0 write_sni_candidate_library full "$tmp/sni-full.txt"
+    sni_count=$(wc -l < "$tmp/sni-full.txt" | tr -d ' ')
+    [[ "$sni_count" =~ ^[0-9]+$ && "$sni_count" -ge 2500 ]] || { echo "FAIL: SNI library size < 2500 ($sni_count)"; failures=$((failures + 1)); }
+    grep -qx 'www.confluent.io' "$tmp/sni-full.txt" || { echo 'FAIL: SNI library missing www.confluent.io'; failures=$((failures + 1)); }
+    grep -qx 'www.apache.org' "$tmp/sni-full.txt" || { echo 'FAIL: SNI library missing www.apache.org'; failures=$((failures + 1)); }
+    ABOX_SNI_MINI_MAX=520 write_sni_candidate_library mini "$tmp/sni-mini.txt"
+    mini_count=$(wc -l < "$tmp/sni-mini.txt" | tr -d ' ')
+    [[ "$mini_count" =~ ^[0-9]+$ && "$mini_count" -ge 400 ]] || { echo "FAIL: SNI mini library size < 400 ($mini_count)"; failures=$((failures + 1)); }
     assert_ok valid_ipv4_cidr 192.0.2.1/24
     assert_bad valid_ipv4_cidr 999.0.2.1/24
     assert_ok valid_ipv6_cidr 2001:db8::1/64
@@ -3141,19 +4363,19 @@ main_loop() {
             msg "${GREEN}2.${NC} VLESS-XHTTP-Reality                ${GREEN}7.${NC} Shadowsocks-2022"
             msg "${GREEN}3.${NC} Shadowsocks-2022                   ${GREEN}8.${NC} VLESS + SS-2022"
             msg "${GREEN}4.${NC} Hysteria 2 (Native/Apernet)        ${GREEN}9.${NC} Hysteria 2 (Sing-box)"
-            msg "${GREEN}5.${NC} All-in-one (Xray+Hy2)             ${GREEN}10.${NC} All-in-one (Sing-box)"
+            msg "${GREEN}5.${NC} All-in-one (Xray+Hy2)              ${GREEN}10.${NC} All-in-one (Sing-box)"
             msg "${BLUE}----------------------------------------------------------------------${NC}"
             msg "${GREEN}11.${NC} Toolbox"
             msg "${GREEN}12.${NC} VPS One-click Optimization"
             msg "${GREEN}13.${NC} Display All Node Parameters"
             msg "${GREEN}14.${NC} Manual"
-            msg "${GREEN}15.${NC} OTA & Geo Update"
+            msg "${GREEN}15.${NC} OTA, Geo & Core Upgrade"
             msg "${GREEN}16.${NC} Clean Uninstall"
             msg "${GREEN}17.${NC} Delete Nodes & Reinitialize Environment"
             msg "${GREEN}18.${NC} Monthly Traffic Limit"
             msg "${GREEN}19.${NC} SS-2022 Whitelist Manager"
             msg "${GREEN}20.${NC} Language"
-            msg "${GREEN} 0.${NC} Exit"
+            msg "${GREEN}0.${NC} Exit"
             msg "${BLUE}======================================================================${NC}"
             read -r -ep "$(tr_msg main_command)" choice
         else
@@ -3164,19 +4386,19 @@ main_loop() {
             msg "${GREEN}2.${NC} VLESS-XHTTP-Reality                ${GREEN}7.${NC} Shadowsocks-2022"
             msg "${GREEN}3.${NC} Shadowsocks-2022                   ${GREEN}8.${NC} VLESS + SS-2022"
             msg "${GREEN}4.${NC} Hysteria 2 (官方/Apernet)          ${GREEN}9.${NC} Hysteria 2 (Sing-box)"
-            msg "${GREEN}5.${NC} 全协议四合一 (Xray+Hy2)           ${GREEN}10.${NC} 全协议三合一 (Sing-box)"
+            msg "${GREEN}5.${NC} 全协议四合一 (Xray+Hy2)            ${GREEN}10.${NC} 全协议三合一 (Sing-box)"
             msg "${BLUE}----------------------------------------------------------------------${NC}"
             msg "${GREEN}11.${NC} 综合工具箱"
             msg "${GREEN}12.${NC} VPS 一键优化"
             msg "${GREEN}13.${NC} 全部节点参数显示"
             msg "${GREEN}14.${NC} 脚本说明书"
-            msg "${GREEN}15.${NC} 脚本 OTA 升级与 Xray Geo 资源更新"
+            msg "${GREEN}15.${NC} 脚本 OTA、Xray Geo 与核心无损升级"
             msg "${GREEN}16.${NC} 一键全部清空卸载"
             msg "${GREEN}17.${NC} 删除全部节点与环境初始化"
             msg "${GREEN}18.${NC} 每月流量管控限制"
             msg "${GREEN}19.${NC} SS-2022 白名单 IP 管理"
             msg "${GREEN}20.${NC} 语言设置 / Language"
-            msg "${GREEN} 0.${NC} 退出脚本"
+            msg "${GREEN}0.${NC} 退出脚本"
             msg "${BLUE}======================================================================${NC}"
             read -r -ep "$(tr_msg main_command)" choice
         fi
