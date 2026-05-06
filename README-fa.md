@@ -1,6 +1,7 @@
 [English](README.md) | [简体中文](README-zh.md) | [Русский](README-ru.md) | [فارسی](README-fa.md)
 
-<img width="620" height="705" alt="屏幕快照 2026-05-06 的 00 11 48 上午" src="https://github.com/user-attachments/assets/92827da9-ce36-4db9-ad2d-8579b011de1e" />
+<img width="1254" height="1254" alt="图标" src="https://github.com/user-attachments/assets/d45171b6-17f2-45da-9c60-e6b8b64301c1" />
+
 
 
 
