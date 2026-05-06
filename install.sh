@@ -6605,7 +6605,10 @@ sni_org_cdn_penalty() {
 sni_probe_domain() {
     local domain="$1" raw="$2" timeout_s="${3:-6}" metrics code t_connect t_app t_start t_total http_version remote_ip penalty score tls_args=()
     [[ "$domain" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$ ]] || return 0
-    if curl --help all 2>/dev/null | grep -q -- '--tlsv1.3'; then
+    # Fast path: detect curl TLS 1.3 capability once in run_builtin_sni_radar.
+    # This preserves probe semantics while avoiding one `curl --help all | grep`
+    # subprocess chain per candidate domain on large libraries.
+    if [[ "${ABOX_CURL_TLS13_SUPPORTED:-0}" == '1' ]]; then
         tls_args=(--tlsv1.3)
     fi
     metrics=$(curl -sSIL "${tls_args[@]}" --connect-timeout "$timeout_s" --max-time "$((timeout_s + 4))" \
@@ -6703,6 +6706,11 @@ run_builtin_sni_radar() {
     raw_sorted="$workdir/results.raw.sorted.tsv"
     report="$workdir/results.tsv"
     write_sni_candidate_library "$profile" "$candidates"
+    if curl --help all 2>/dev/null | grep -q -- '--tlsv1.3'; then
+        ABOX_CURL_TLS13_SUPPORTED=1
+    else
+        ABOX_CURL_TLS13_SUPPORTED=0
+    fi
     total=$(wc -l < "$candidates" | tr -d ' ')
     if [[ "$profile" == 'mini' ]]; then
         # Mini mode uses the same candidate library as full mode. It reduces concurrency and verification depth only.
